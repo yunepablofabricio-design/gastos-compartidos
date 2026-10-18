@@ -145,4 +145,4 @@ with pestanas[0]:
     
     with st.expander("Modificar Alias de Participantes"):
         for i, p in enumerate(st.session_state.participantes):
-            alias_rapido = st.text_input("Alias para " + p['nombre'], value=p
+           alias_rapido = st.text_input("Alias para " + p['nombre'], value=p['alias'], key="alias_res_" + str(i))
