@@ -202,4 +202,77 @@ with pestanas[0]:
                 st.markdown('<a href="' + url_ind + '" target="_blank"><button style="background-color:#25D366; color:white; border:none; padding:6px 12px; border-radius:4px; font-size:13px; font-weight:bold; cursor:pointer; margin-bottom:10px;">Enviar WhatsApp a ' + p_nombre + '</button></a>', unsafe_allow_html=True)
 
             elif saldo < -0.01:
-                st.write("- **" + p
+                st.write("- **" + p_nombre + "**: debe pagar **$" + f"{abs(saldo):,.2f}" + "**")
+                
+                msj_ind = "Hola " + p_nombre + ", este es tu resumen de gastos.\n\n"
+                msj_ind += "Debes abonar la suma de: $" + f"{abs(saldo):,.2f}" + "\n\n"
+                msj_ind += "Tus consumos y gastos registrados:\n"
+                for item in detalle_personal[p_nombre]:
+                    msj_ind += "- " + item + "\n"
+                
+                msj_ind += "\nPuedes transferir a los siguientes alias:\n"
+                for otro_p, otro_saldo in saldos.items():
+                    if otro_saldo > 0.01:
+                        a_ext = mapa_alias.get(otro_p, '[Sin alias]')
+                        msj_ind += "- " + otro_p + ": " + a_ext + "\n"
+
+                url_ind = "https://api.whatsapp.com/send?text=" + urllib.parse.quote(msj_ind)
+                st.markdown('<a href="' + url_ind + '" target="_blank"><button style="background-color:#25D366; color:white; border:none; padding:6px 12px; border-radius:4px; font-size:13px; font-weight:bold; cursor:pointer; margin-bottom:10px;">Enviar WhatsApp a ' + p_nombre + '</button></a>', unsafe_allow_html=True)
+            else:
+                st.write("- **" + p_nombre + "**: al día ($0.00)")
+                
+        if st.button("Eliminar último gasto"):
+            st.session_state.gastos = st.session_state.gastos.iloc[:-1].reset_index(drop=True)
+            guardar_datos(st.session_state.participantes, st.session_state.gastos)
+            st.rerun()
+            
+        st.markdown("---")
+        st.subheader("Enviar Resumen Corto al Grupo de WhatsApp")
+        
+        # Formato idéntico a la imagen provista
+        lineas = []
+        lineas.append("RESUMEN DE GASTOS")
+        lineas.append("")
+        lineas.append("COMPRAS:")
+        
+        for index, row in st.session_state.gastos.iterrows():
+            lineas.append("  · " + str(row['Descripción']) + " ($" + f"{float(row['Monto']):,.2f}" + " pagado por " + str(row['Pagado por']) + ")")
+            
+        lineas.append("")
+        lineas.append("TOTAL: $" + f"{total_general:,.2f}")
+        lineas.append("Compartido por persona: $" + f"{compartido_por_persona:,.2f}")
+        lineas.append("")
+        lineas.append("SALDOS:")
+        
+        for p_nombre, saldo in saldos.items():
+            gasto_p = total_pagado.get(p_nombre, 0.0)
+            alias_val = mapa_alias.get(p_nombre, '')
+            alias_txt = " (Alias: " + alias_val + ")" if alias_val else ""
+            
+            if saldo > 0.01:
+                if gasto_p > 0:
+                    lineas.append("  · " + p_nombre + ": gastó $" + f"{gasto_p:,.2f}" + " y debe recibir $" + f"{saldo:,.2f}" + alias_txt)
+                else:
+                    lineas.append("  · " + p_nombre + ": debe recibir $" + f"{saldo:,.2f}" + alias_txt)
+            elif saldo < -0.01:
+                if gasto_p > 0:
+                    lineas.append("  · " + p_nombre + ": gastó $" + f"{gasto_p:,.2f}" + " y debe $" + f"{abs(saldo):,.2f}")
+                else:
+                    lineas.append("  · " + p_nombre + ": debe $" + f"{abs(saldo):,.2f}")
+            else:
+                lineas.append("  · " + p_nombre + ": al día")
+
+        # Lista de Alias al final del mensaje
+        lineas.append("")
+        lineas.append("ALIAS PARA TRANSFERIR:")
+        for p_nombre in nombres_participantes:
+            alias_val = mapa_alias.get(p_nombre, '')
+            if alias_val:
+                lineas.append("  · " + p_nombre + ": " + alias_val)
+
+        mensaje_grupo = "\n".join(lineas)
+        
+        url_whatsapp_grupo = "https://api.whatsapp.com/send?text=" + urllib.parse.quote(mensaje_grupo)
+        st.markdown('<a href="' + url_whatsapp_grupo + '" target="_blank"><button style="background-color:#25D366; color:white; border:none; padding:10px 20px; border-radius:5px; font-weight:bold; cursor:pointer; width:100%;">Enviar Resumen Corto al Grupo</button></a>', unsafe_allow_html=True)
+    else:
+        st.info("Aún no hay gastos registrados.")
