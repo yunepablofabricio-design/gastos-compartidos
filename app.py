@@ -61,6 +61,7 @@ pestanas = st.tabs(["📊 Resumen & WhatsApp", "💸 Registrar Gasto", "👥 Par
 
 nombres_participantes = [p["nombre"] for p in st.session_state.participantes]
 
+# Pestaña de Participantes
 with pestanas[2]:
     st.subheader("Configuración de Participantes y Alias")
     
@@ -105,6 +106,7 @@ with pestanas[2]:
         guardar_datos(st.session_state.participantes, st.session_state.gastos)
         st.rerun()
 
+# Pestaña de Registrar Gasto
 with pestanas[1]:
     st.subheader("Registrar Nuevo Gasto")
     if len(nombres_participantes) == 0:
@@ -133,6 +135,7 @@ with pestanas[1]:
                 else:
                     st.error("Por favor complete todos los campos y seleccione participantes.")
 
+# Pestaña de Resumen & WhatsApp
 with pestanas[0]:
     st.subheader("Resumen de Cuentas")
     
@@ -149,8 +152,13 @@ with pestanas[0]:
         
         st.session_state.gastos["Monto"] = pd.to_numeric(st.session_state.gastos["Monto"], errors="coerce").fillna(0.0)
         total_general = st.session_state.gastos["Monto"].sum()
+        num_participantes = len(nombres_participantes) if len(nombres_participantes) > 0 else 1
+        compartido_por_persona = total_general / num_participantes
+
         st.metric("Gasto Total Acumulado", "$" + f"{total_general:,.2f}")
         
+        # Totales gastados y balances por persona
+        total_pagado = {p["nombre"]: 0.0 for p in st.session_state.participantes}
         saldos = {p["nombre"]: 0.0 for p in st.session_state.participantes}
         detalle_personal = {p["nombre"]: [] for p in st.session_state.participantes}
         
@@ -165,6 +173,7 @@ with pestanas[0]:
                 cuota = monto / len(beneficiarios)
                 if pagador in saldos:
                     saldos[pagador] += monto
+                    total_pagado[pagador] += monto
                     detalle_personal[pagador].append("Pagó '" + desc + "' por $" + f"{monto:,.2f}")
                 
                 for b in beneficiarios:
@@ -193,70 +202,4 @@ with pestanas[0]:
                 st.markdown('<a href="' + url_ind + '" target="_blank"><button style="background-color:#25D366; color:white; border:none; padding:6px 12px; border-radius:4px; font-size:13px; font-weight:bold; cursor:pointer; margin-bottom:10px;">Enviar WhatsApp a ' + p_nombre + '</button></a>', unsafe_allow_html=True)
 
             elif saldo < -0.01:
-                st.write("- **" + p_nombre + "**: debe pagar **$" + f"{abs(saldo):,.2f}" + "**")
-                
-                msj_ind = "Hola " + p_nombre + ", este es tu resumen de gastos.\n\n"
-                msj_ind += "Debes abonar la suma de: $" + f"{abs(saldo):,.2f}" + "\n\n"
-                msj_ind += "Tus consumos y gastos registrados:\n"
-                for item in detalle_personal[p_nombre]:
-                    msj_ind += "- " + item + "\n"
-                
-                msj_ind += "\nPuedes transferir a los siguientes alias:\n"
-                for otro_p, otro_saldo in saldos.items():
-                    if otro_saldo > 0.01:
-                        a_ext = mapa_alias.get(otro_p, '[Sin alias]')
-                        msj_ind += f"- {otro_p}: {a_ext}\n"
-
-                url_ind = "https://api.whatsapp.com/send?text=" + urllib.parse.quote(msj_ind)
-                st.markdown('<a href="' + url_ind + '" target="_blank"><button style="background-color:#25D366; color:white; border:none; padding:6px 12px; border-radius:4px; font-size:13px; font-weight:bold; cursor:pointer; margin-bottom:10px;">Enviar WhatsApp a ' + p_nombre + '</button></a>', unsafe_allow_html=True)
-            else:
-                st.write("- **" + p_nombre + "**: al día ($0.00)")
-                
-        if st.button("Eliminar último gasto"):
-            st.session_state.gastos = st.session_state.gastos.iloc[:-1].reset_index(drop=True)
-            guardar_datos(st.session_state.participantes, st.session_state.gastos)
-            st.rerun()
-            
-        st.markdown("---")
-        st.subheader("Enviar Resumen Corto al Grupo de WhatsApp")
-        
-        lineas = []
-        lineas.append("RESUMEN DE GASTOS")
-        lineas.append("")
-        lineas.append("COMPRAS:")
-        lineas.append("")
-        
-        for index, row in st.session_state.gastos.iterrows():
-            lineas.append("- " + str(row['Descripción']) + " ($" + f"{float(row['Monto']):,.2f}" + " pagado por " + str(row['Pagado por']) + ")")
-            lineas.append("")
-            
-        lineas.append("TOTAL: $" + f"{total_general:,.2f}")
-        lineas.append("")
-        lineas.append("DETALLE POR PERSONA:")
-        lineas.append("")
-        for p_nombre in nombres_participantes:
-            lineas.append("*" + p_nombre + "*:")
-            if detalle_personal[p_nombre]:
-                for mov in detalle_personal[p_nombre]:
-                    lineas.append("  - " + mov)
-            else:
-                lineas.append("  - Sin movimientos")
-            lineas.append("")
-
-        lineas.append("SALDOS Y ALIAS PARA TRANSFERIR:")
-        for p_nombre, saldo in saldos.items():
-            alias_val = mapa_alias.get(p_nombre, '')
-            alias_txt = f" (Alias: {alias_val})" if alias_val else " (Alias: [No configurado])"
-            if saldo > 0.01:
-                lineas.append("- " + p_nombre + ": recibe $" + f"{saldo:,.2f}" + alias_txt)
-            elif saldo < -0.01:
-                lineas.append("- " + p_nombre + ": debe $" + f"{abs(saldo):,.2f}")
-            else:
-                lineas.append("- " + p_nombre + ": al día" + alias_txt)
-            
-        mensaje_grupo = "\n".join(lineas)
-        
-        url_whatsapp_grupo = "https://api.whatsapp.com/send?text=" + urllib.parse.quote(mensaje_grupo)
-        st.markdown('<a href="' + url_whatsapp_grupo + '" target="_blank"><button style="background-color:#25D366; color:white; border:none; padding:10px 20px; border-radius:5px; font-weight:bold; cursor:pointer; width:100%;">Enviar Resumen Corto al Grupo</button></a>', unsafe_allow_html=True)
-    else:
-        st.info("Aún no hay gastos registrados.")
+                st.write("- **" + p
