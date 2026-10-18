@@ -4,10 +4,9 @@ import numpy as np
 from datetime import datetime
 import urllib.parse
 
-# Configuración de la página
+# Configuración de página
 st.set_page_config(page_title="Divisor de Gastos & WhatsApp", page_icon="💸", layout="centered")
 
-# Estilos CSS
 st.markdown("""
     <style>
     .main { background-color: #f8f9fa; }
@@ -18,7 +17,7 @@ st.markdown("""
 st.title("Divisor de Gastos & WhatsApp")
 st.markdown("---")
 
-# Inicialización del estado (comienza vacío si no hay participantes guardados)
+# Inicialización de estado para persistencia
 if 'participantes' not in st.session_state:
     st.session_state.participantes = []
 
@@ -26,51 +25,51 @@ if 'gastos' not in st.session_state:
     st.session_state.gastos = pd.DataFrame(columns=["Fecha", "Descripción", "Pagado por", "Monto", "Participantes"])
 
 # Pestañas principales
-tab1, tab2, tab3 = st.tabs(["📊 Resumen & WhatsApp", "💸 Registrar Gasto", "👥 Participantes"])
+tab_resumen, tab_registro, tab_participantes = st.tabs([
+    "📊 Resumen & WhatsApp", 
+    "💸 Registrar Gasto", 
+    "👥 Participantes"
+])
 
-# --- PESTAÑA 3: PARTICIPANTES ---
-with tab3:
+# --- PESTAÑA: PARTICIPANTES ---
+with tab_participantes:
     st.subheader("Configuración de Participantes")
+    nuevo_p = st.text_input("Nombre del nuevo participante")
     
-    nuevo_p = st.text_input("Nombre del participante")
-    
-    col_add, col_clear = st.columns(2)
-    with col_add:
+    col1, col2 = st.columns(2)
+    with col1:
         if st.button("Agregar Participante"):
             if nuevo_p and nuevo_p.strip() not in st.session_state.participantes:
                 st.session_state.participantes.append(nuevo_p.strip())
                 st.success(f"Se agregó a {nuevo_p.strip()}")
                 st.rerun()
             elif nuevo_p.strip() in st.session_state.participantes:
-                st.warning("El participante ya está en la lista.")
-    
-    with col_clear:
+                st.warning("Ese participante ya existe.")
+    with col2:
         if st.button("Vaciar Lista"):
             st.session_state.participantes = []
             st.rerun()
-            
+
     st.markdown("---")
     st.write("**Lista Actual de Participantes:**")
-    
     if len(st.session_state.participantes) == 0:
-        st.info("No hay participantes registrados. Agrega uno arriba.")
+        st.info("No hay participantes registrados. Agrega algunos arriba.")
     else:
-        # Permitir eliminar participantes individualmente
         for i, p in enumerate(st.session_state.participantes):
-            col_nombre, col_borrar = st.columns([3, 1])
-            with col_nombre:
-                st.write(f"• {p}")
-            with col_borrar:
-                if st.button("Eliminar", key=f"del_{i}"):
+            c1, c2 = st.columns([3, 1])
+            with c1:
+                st.write(f"- {p}")
+            with c2:
+                if st.button("Borrar", key=f"del_p_{i}"):
                     st.session_state.participantes.pop(i)
                     st.rerun()
 
-# --- PESTAÑA 2: REGISTRAR GASTO ---
-with tab2:
+# --- PESTAÑA: REGISTRAR GASTO ---
+with tab_registro:
     st.subheader("Registrar Nuevo Gasto")
     
     if len(st.session_state.participantes) == 0:
-        st.warning("Por favor agrega al menos un participante en la pestaña '👥 Participantes'.")
+        st.warning("Por favor, agregue al menos un participante en la pestaña '👥 Participantes'.")
     else:
         with st.form("form_gasto", clear_on_submit=True):
             descripcion = st.text_input("Descripción del gasto")
@@ -80,7 +79,6 @@ with tab2:
             fecha = st.date_input("Fecha", datetime.now())
             
             submit = st.form_submit_button("Guardar Gasto")
-            
             if submit:
                 if descripcion and monto > 0 and dividir_entre:
                     nuevo_gasto = pd.DataFrame({
@@ -93,28 +91,54 @@ with tab2:
                     st.session_state.gastos = pd.concat([st.session_state.gastos, nuevo_gasto], ignore_index=True)
                     st.success("Gasto guardado con éxito.")
                 else:
-                    st.error("Por favor complete la descripción, el monto y al menos un participante.")
+                    st.error("Por favor complete todos los campos y seleccione al menos un participante.")
 
-# --- PESTAÑA 1: RESUMEN & WHATSAPP ---
-with tab1:
-    st.subheader("Resumen General de Cuentas")
+# --- PESTAÑA: RESUMEN & WHATSAPP ---
+with tab_resumen:
+    st.subheader("Resumen de Cuentas y Detalle por Persona")
     
     if len(st.session_state.gastos) > 0:
         st.write("**Historial de Gastos:**")
         st.dataframe(st.session_state.gastos, use_container_width=True)
         
-        total_acumulado = st.session_state.gastos["Monto"].sum()
-        st.metric("Total Acumulado", f"${total_acumulado:,.2f}")
+        total_general = st.session_state.gastos["Monto"].sum()
+        st.metric("Gasto Total Acumulado", f"${total_general:,.2f}")
         
-        if st.button("Eliminar Último Gasto"):
+        # Calcular cuánto le corresponde a cada uno detalladamente por gasto
+        st.markdown("---")
+        st.subheader("Detalle de lo que corresponde a cada participante")
+        
+        # Diccionario para acumular saldos
+        balance_individual = {p: 0.0 for p in st.session_state.participantes}
+        pagado_individual = {p: 0.0 for p in st.session_state.participantes}
+        
+        for idx, row in st.session_state.gastos.iterrows():
+            monto_gasto = row["Monto"]
+            pagador_gasto = row["Pagado por"]
+            partic_gasto = [p.strip() for p in row["Participantes"].split(",")]
+            
+            if pagador_gasto in pagado_individual:
+                pagado_individual[pagador_gasto] += monto_gasto
+                
+            if len(partic_gasto) > 0:
+                monto_por_persona = monto_gasto / len(partic_gasto)
+                for p in partic_gasto:
+                    if p in balance_individual:
+                        balance_individual[p] += monto_por_persona
+
+        for p in st.session_state.participantes:
+            st.write(f"• **{p}**: Pagó ${pagado_individual.get(p, 0.0):,.2f} | Le corresponde consumir/aportar: ${balance_individual.get(p, 0.0):,.2f}")
+
+        if st.button("Eliminar último gasto"):
             st.session_state.gastos = st.session_state.gastos.iloc[:-1].reset_index(drop=True)
             st.rerun()
             
         st.markdown("---")
         st.subheader("Enviar Detalle por WhatsApp")
         
-        # Mensaje formal para WhatsApp sin emojis ni clasificaciones de tipo
+        # Mensaje formal para WhatsApp (sin emojis ni tipo)
         mensaje = "RESUMEN DE GASTOS COMPARTIDOS\n\n"
+        mensaje += "DETALLE DE GASTOS:\n"
         for idx, row in st.session_state.gastos.iterrows():
             mensaje += f"- Fecha: {row['Fecha']}\n"
             mensaje += f"  Descripción: {row['Descripción']}\n"
@@ -122,9 +146,12 @@ with tab1:
             mensaje += f"  Monto: ${row['Monto']:,.2f}\n"
             mensaje += f"  Dividido entre: {row['Participantes']}\n\n"
             
-        mensaje += f"Total General: ${total_acumulado:,.2f}"
+        mensaje += f"TOTAL GENERAL: ${total_general:,.2f}\n\n"
+        mensaje += "BALANCE POR PARTICIPANTE:\n"
+        for p in st.session_state.participantes:
+            mensaje += f"- {p}: Pagó ${pagado_individual.get(p, 0.0):,.2f} | Le corresponde: ${balance_individual.get(p, 0.0):,.2f}\n"
         
         url_whatsapp = f"https://api.whatsapp.com/send?text={urllib.parse.quote(mensaje)}"
-        st.markdown(f'<a href="{url_whatsapp}" target="_blank"><button style="background-color:#25D366; color:white; border:none; padding:12px 20px; border-radius:6px; font-weight:bold; cursor:pointer; width:100%;">Enviar por WhatsApp</button></a>', unsafe_allow_html=True)
+        st.markdown(f'<a href="{url_whatsapp}" target="_blank"><button style="background-color:#25D366; color:white; border:none; padding:12px 20px; border-radius:6px; font-weight:bold; cursor:pointer; width:100%;">Enviar Resumen por WhatsApp</button></a>', unsafe_allow_html=True)
     else:
         st.info("Aún no hay gastos registrados.")
