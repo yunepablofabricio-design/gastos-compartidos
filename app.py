@@ -13,7 +13,7 @@ st.markdown("""
     .main { background-color: #f8f9fa; }
     .stButton>button { width: 100%; border-radius: 6px; font-weight: bold; }
     </style>
-""", unsafe_allow_html=True)
+, unsafe_allow_html=True)
 
 st.title("Divisor de Gastos & WhatsApp")
 st.markdown("---")
