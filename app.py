@@ -18,7 +18,6 @@ st.markdown("""
 st.title("Gestión de Gastos Compartidos")
 st.markdown("---")
 
-# Archivo local para persistencia permanente en GitHub
 DATA_FILE = "gastos_data.json"
 
 def cargar_datos():
@@ -44,13 +43,11 @@ def guardar_datos(participantes, gastos):
     with open(DATA_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
 
-# Inicializar datos desde el archivo
 if 'participantes' not in st.session_state or 'gastos' not in st.session_state:
     p, g = cargar_datos()
     st.session_state.participantes = p
     st.session_state.gastos = g
 
-# Pestañas de navegación
 pestanas = st.tabs(["Registrar Gasto", "Participantes", "Resumen & WhatsApp"])
 
 with pestanas[1]:
@@ -121,14 +118,19 @@ with pestanas[2]:
         st.markdown("---")
         st.subheader("Enviar Detalle por WhatsApp")
         
+        # Mensaje con espaciado amplio, numerado y formal
         mensaje = "RESUMEN DE GASTOS COMPARTIDOS\n\n"
         for index, row in st.session_state.gastos.iterrows():
-            mensaje += f"- Fecha: {row['Fecha']}\n"
-            mensaje += f"  Descripción: {row['Descripción']}\n"
-            mensaje += f"  Pagado por: {row['Pagado por']}\n"
-            mensaje += f"  Monto: ${row['Monto']:,.2f}\n"
-            mensaje += f"  Dividido entre: {row['Participantes']}\n\n"
-        mensaje += f"Total General: ${total_general:,.2f}"
+            num = index + 1
+            mensaje += f"*GASTO {num}*\n"
+            mensaje += f"• Fecha: {row['Fecha']}\n"
+            mensaje += f"• Descripción: {row['Descripción']}\n"
+            mensaje += f"• Pagado por: {row['Pagado por']}\n"
+            mensaje += f"• Monto: ${row['Monto']:,.2f}\n"
+            mensaje += f"• Dividido entre: {row['Participantes']}\n\n\n"
+            
+        mensaje += f"----------------------------------\n"
+        mensaje += f"*TOTAL GENERAL: ${total_general:,.2f}*"
         
         url_whatsapp = f"https://api.whatsapp.com/send?text={urllib.parse.quote(mensaje)}"
         st.markdown(f'<a href="{url_whatsapp}" target="_blank"><button style="background-color:#25D366; color:white; border:none; padding:10px 20px; border-radius:5px; font-weight:bold; cursor:pointer; width:100%;">Enviar por WhatsApp</button></a>', unsafe_allow_html=True)
