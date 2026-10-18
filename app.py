@@ -6,7 +6,7 @@ import urllib.parse
 import json
 import os
 
-st.set_page_config(page_title="Divisor de Gastos App", page_icon="💸", layout="centered")
+st.set_page_config(page_title="Gestión de Gastos Compartidos", page_icon="💰", layout="centered")
 
 st.markdown("""
     <style>
@@ -15,9 +15,10 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("Divisor de Gastos & WhatsApp")
+st.title("Gestión de Gastos Compartidos")
 st.markdown("---")
 
+# Archivo local para persistencia permanente en GitHub
 DATA_FILE = "gastos_data.json"
 
 def cargar_datos():
@@ -25,7 +26,7 @@ def cargar_datos():
         try:
             with open(DATA_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                participantes = data.get("participantes", ["Pablo", "Mel"])
+                participantes = data.get("participantes", ["Participante 1", "Participante 2"])
                 gastos_dict = data.get("gastos", [])
                 gastos = pd.DataFrame(gastos_dict)
                 if gastos.empty:
@@ -33,7 +34,7 @@ def cargar_datos():
                 return participantes, gastos
         except:
             pass
-    return ["Pablo", "Mel"], pd.DataFrame(columns=["Fecha", "Descripción", "Pagado por", "Monto", "Participantes"])
+    return ["Participante 1", "Participante 2"], pd.DataFrame(columns=["Fecha", "Descripción", "Pagado por", "Monto", "Participantes"])
 
 def guardar_datos(participantes, gastos):
     data = {
@@ -43,15 +44,16 @@ def guardar_datos(participantes, gastos):
     with open(DATA_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
 
+# Inicializar datos desde el archivo
 if 'participantes' not in st.session_state or 'gastos' not in st.session_state:
     p, g = cargar_datos()
     st.session_state.participantes = p
     st.session_state.gastos = g
 
-pestanas = st.tabs(["Resumen & WhatsApp", "Registrar Gasto", "Participantes"])
+# Pestañas de navegación
+pestanas = st.tabs(["Registrar Gasto", "Participantes", "Resumen & WhatsApp"])
 
-# Pestaña 3: Participantes
-with pestanas[2]:
+with pestanas[1]:
     st.subheader("Configuración de Participantes")
     nuevo_participante = st.text_input("Nombre del nuevo participante")
     col1, col2 = st.columns(2)
@@ -66,16 +68,15 @@ with pestanas[2]:
                 st.warning("Ese participante ya existe.")
     with col2:
         if st.button("Reiniciar lista"):
-            st.session_state.participantes = ["Pablo", "Mel"]
+            st.session_state.participantes = ["Participante 1", "Participante 2"]
             guardar_datos(st.session_state.participantes, st.session_state.gastos)
             st.rerun()
 
     st.write("**Participantes actuales:**")
-    for p in st.session_state.participantes:
+    for i, p in enumerate(st.session_state.participantes):
         st.write(f"- {p}")
 
-# Pestaña 2: Registrar Gasto
-with pestanas[1]:
+with pestanas[0]:
     st.subheader("Registrar Nuevo Gasto")
     if len(st.session_state.participantes) == 0:
         st.warning("Por favor, agregue al menos un participante en la pestaña 'Participantes'.")
@@ -84,4 +85,52 @@ with pestanas[1]:
             descripcion = st.text_input("Descripción del gasto")
             monto = st.number_input("Monto total", min_value=0.0, format="%.2f")
             pagador = st.selectbox("Pagado por", st.session_state.participantes)
-            dividir_entre
+            dividir_entre = st.multiselect("Dividir entre", st.session_state.participantes, default=st.session_state.participantes)
+            fecha = st.date_input("Fecha", datetime.now())
+            
+            submit = st.form_submit_button("Guardar Gasto")
+            if submit:
+                if descripcion and monto > 0 and dividir_entre:
+                    nuevo_gasto = pd.DataFrame({
+                        "Fecha": [fecha.strftime("%Y-%m-%d")],
+                        "Descripción": [descripcion],
+                        "Pagado por": [pagador],
+                        "Monto": [monto],
+                        "Participantes": [", ".join(dividir_entre)]
+                    })
+                    st.session_state.gastos = pd.concat([st.session_state.gastos, nuevo_gasto], ignore_index=True)
+                    guardar_datos(st.session_state.participantes, st.session_state.gastos)
+                    st.success("Gasto registrado exitosamente.")
+                else:
+                    st.error("Por favor complete todos los campos y seleccione participantes.")
+
+with pestanas[2]:
+    st.subheader("Resumen de Cuentas")
+    if len(st.session_state.gastos) > 0:
+        st.write("**Detalle de Gastos:**")
+        st.dataframe(st.session_state.gastos, use_container_width=True)
+        
+        total_general = st.session_state.gastos["Monto"].sum()
+        st.metric("Gasto Total Acumulado", f"${total_general:,.2f}")
+        
+        if st.button("Eliminar último gasto"):
+            st.session_state.gastos = st.session_state.gastos.iloc[:-1].reset_index(drop=True)
+            guardar_datos(st.session_state.participantes, st.session_state.gastos)
+            st.rerun()
+            
+        st.markdown("---")
+        st.subheader("Enviar Detalle por WhatsApp")
+        
+        mensaje = "RESUMEN DE GASTOS COMPARTIDOS\n\n"
+        for index, row in st.session_state.gastos.iterrows():
+            mensaje += f"- Fecha: {row['Fecha']}\n"
+            mensaje += f"  Descripción: {row['Descripción']}\n"
+            mensaje += f"  Pagado por: {row['Pagado por']}\n"
+            mensaje += f"  Monto: ${row['Monto']:,.2f}\n"
+            mensaje += f"  Dividido entre: {row['Participantes']}\n\n"
+        mensaje += f"Total General: ${total_general:,.2f}"
+        
+        url_whatsapp = f"https://api.whatsapp.com/send?text={urllib.parse.quote(mensaje)}"
+        st.markdown(f'<a href="{url_whatsapp}" target="_blank"><button style="background-color:#25D366; color:white; border:none; padding:10px 20px; border-radius:5px; font-weight:bold; cursor:pointer; width:100%;">Enviar por WhatsApp</button></a>', unsafe_allow_html=True)
+    else:
+        st.info("Aún no hay gastos registrados.")
