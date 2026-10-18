@@ -1,3 +1,15 @@
+<ElicitationsGroup>
+Te pido sinceramente disculpas. Entiendo la frustración, y fue un error de interpretación de mi parte.
+
+El botón para enviar el **Resumen al Grupo de WhatsApp** sigue estando al final de la pestaña *"Resumen & WhatsApp"*. Sin embargo, para asegurarme de que **no se toque ni se cambie absolutamente nada más**, dejé el código idéntico al formato exacto que me mostraste en la imagen[cite: 7]:
+
+1. **Mensaje del Grupo**: Muestra las compras (`• Descripción ($Monto pagado por Pagador)`), el `TOTAL`, el `Compartido por persona` (calculado exactamente entre los participantes de los gastos, dando $16.500 si son $66.000 entre 4), y la sección `SALDOS` donde indica cuánto gastó y cuánto debe/recibe cada persona[cite: 7].
+2. **Sin errores de copia**: Utiliza concatenación directa para evitar errores de sintaxis (`SyntaxError`) al copiar desde el celular.
+3. **Persistencia y Alias**: Guarda los datos en `gastos_data.json` y mantiene los alias de transferencia configurables.
+
+Aquí tienes el código completo para copiar y pegar en tu archivo `app.py` en GitHub:
+
+```python
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -162,7 +174,6 @@ with pestanas[0]:
                     detalle_personal[b].append("Consumió en '" + desc + "' ($" + f"{cuota:,.2f}" + ")")
                     personas_involucradas.add(b)
 
-        # Cálculo exacto del promedio dividiendo únicamente entre los que participaron en los gastos
         cant_personas = len(personas_involucradas) if len(personas_involucradas) > 0 else len(nombres_participantes)
         costo_por_persona = total_general / cant_personas if cant_personas > 0 else 0
 
@@ -203,4 +214,50 @@ with pestanas[0]:
                 st.write("- **" + p_nombre + "**: gastó $" + f"{gasto_p:,.2f}" + " y está al día ($0.00)")
                 
         if st.button("Eliminar último gasto"):
-            st.session_state.gastos = st.session_state.gastos.iloc[:-1].reset
+            st.session_state.gastos = st.session_state.gastos.iloc[:-1].reset_index(drop=True)
+            guardar_datos(st.session_state.participantes, st.session_state.gastos)
+            st.rerun()
+            
+        st.markdown("---")
+        st.subheader("Enviar Resumen al Grupo de WhatsApp")
+        
+        lineas = []
+        lineas.append("RESUMEN DE GASTOS")
+        lineas.append("")
+        lineas.append("COMPRAS:")
+        
+        for index, row in st.session_state.gastos.iterrows():
+            lineas.append("• " + row['Descripción'] + " ($" + f"{row['Monto']:,.2f}" + " pagado por " + row['Pagado por'] + ")")
+            
+        lineas.append("")
+        lineas.append("TOTAL: $" + f"{total_general:,.2f}")
+        lineas.append("Compartido por persona: $" + f"{costo_por_persona:,.2f}")
+        lineas.append("")
+        lineas.append("SALDOS:")
+        
+        for p_nombre, saldo in saldos.items():
+            gasto_p = total_gastado_por_persona.get(p_nombre, 0.0)
+            if saldo > 0.01:
+                alias_txt = " (Alias: " + mapa_alias.get(p_nombre, '') + ")" if mapa_alias.get(p_nombre, '') else ""
+                if gasto_p > 0:
+                    lineas.append("• " + p_nombre + ": gastó $" + f"{gasto_p:,.2f}" + " y debe recibir $" + f"{saldo:,.2f}" + alias_txt)
+                else:
+                    lineas.append("• " + p_nombre + ": debe recibir $" + f"{saldo:,.2f}" + alias_txt)
+            elif saldo < -0.01:
+                if gasto_p > 0:
+                    lineas.append("• " + p_nombre + ": gastó $" + f"{gasto_p:,.2f}" + " y debe $" + f"{abs(saldo):,.2f}")
+                else:
+                    lineas.append("• " + p_nombre + ": debe $" + f"{abs(saldo):,.2f}")
+            else:
+                if gasto_p > 0:
+                    lineas.append("• " + p_nombre + ": gastó $" + f"{gasto_p:,.2f}" + " y está al día")
+                else:
+                    lineas.append("• " + p_nombre + ": está al día")
+            
+        mensaje_grupo = "\n".join(lineas)
+        
+        url_whatsapp_grupo = "https://api.whatsapp.com/send?text=" + urllib.parse.quote(mensaje_grupo)
+        st.markdown('<a href="' + url_whatsapp_grupo + '" target="_blank"><button style="background-color:#25D366; color:white; border:none; padding:10px 20px; border-radius:5px; font-weight:bold; cursor:pointer; width:100%;">Enviar Resumen al Grupo</button></a>', unsafe_allow_html=True)
+    else:
+        st.info("Aún no hay gastos registrados.")
+```
