@@ -6,7 +6,7 @@ import urllib.parse
 import json
 import os
 
-st.set_page_config(page_title="Divisor de Gastos", page_icon="💸", layout="centered")
+st.set_page_config(page_title="Divisor de Gastos App", page_icon="💸", layout="centered")
 
 st.markdown("""
     <style>
@@ -25,7 +25,7 @@ def cargar_datos():
         try:
             with open(DATA_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                participantes = data.get("participantes", ["Participante 1", "Participante 2"])
+                participantes = data.get("participantes", ["Pablo", "Mel"])
                 gastos_dict = data.get("gastos", [])
                 gastos = pd.DataFrame(gastos_dict)
                 if gastos.empty:
@@ -33,7 +33,7 @@ def cargar_datos():
                 return participantes, gastos
         except:
             pass
-    return ["Participante 1", "Participante 2"], pd.DataFrame(columns=["Fecha", "Descripción", "Pagado por", "Monto", "Participantes"])
+    return ["Pablo", "Mel"], pd.DataFrame(columns=["Fecha", "Descripción", "Pagado por", "Monto", "Participantes"])
 
 def guardar_datos(participantes, gastos):
     data = {
@@ -66,7 +66,7 @@ with pestanas[2]:
                 st.warning("Ese participante ya existe.")
     with col2:
         if st.button("Reiniciar lista"):
-            st.session_state.participantes = ["Participante 1", "Participante 2"]
+            st.session_state.participantes = ["Pablo", "Mel"]
             guardar_datos(st.session_state.participantes, st.session_state.gastos)
             st.rerun()
 
@@ -84,81 +84,4 @@ with pestanas[1]:
             descripcion = st.text_input("Descripción del gasto")
             monto = st.number_input("Monto total", min_value=0.0, format="%.2f")
             pagador = st.selectbox("Pagado por", st.session_state.participantes)
-            dividir_entre = st.multiselect("Dividir entre", st.session_state.participantes, default=st.session_state.participantes)
-            fecha = st.date_input("Fecha", datetime.now())
-            
-            submit = st.form_submit_button("Guardar Gasto")
-            if submit:
-                if descripcion and monto > 0 and dividir_entre:
-                    nuevo_gasto = pd.DataFrame({
-                        "Fecha": [fecha.strftime("%Y-%m-%d")],
-                        "Descripción": [descripcion],
-                        "Pagado por": [pagador],
-                        "Monto": [monto],
-                        "Participantes": [", ".join(dividir_entre)]
-                    })
-                    st.session_state.gastos = pd.concat([st.session_state.gastos, nuevo_gasto], ignore_index=True)
-                    guardar_datos(st.session_state.participantes, st.session_state.gastos)
-                    st.success("Gasto registrado exitosamente.")
-                else:
-                    st.error("Por favor complete todos los campos y seleccione participantes.")
-
-# Pestaña 1: Resumen & WhatsApp
-with pestanas[0]:
-    st.subheader("Resumen de Cuentas")
-    if len(st.session_state.gastos) > 0:
-        st.write("**Detalle de Compras:**")
-        st.dataframe(st.session_state.gastos, use_container_width=True)
-        
-        total_general = st.session_state.gastos["Monto"].sum()
-        st.metric("Gasto Total Acumulado", f"${total_general:,.2f}")
-        
-        # Cálculo de saldos / cuánto debe cada uno
-        saldos = {p: 0.0 for p in st.session_state.participantes}
-        for _, row in st.session_state.gastos.iterrows():
-            pagador = row["Pagado por"]
-            monto = row["Monto"]
-            beneficiarios = [p.strip() for p in row["Participantes"].split(",") if p.strip() in saldos]
-            if beneficiarios:
-                cuota = monto / len(beneficiarios)
-                if pagador in saldos:
-                    saldos[pagador] += monto
-                for b in beneficiarios:
-                    saldos[b] -= cuota
-
-        st.markdown("---")
-        st.write("**Estado de Cuentas por Persona:**")
-        resumen_cuentas_txt = []
-        for p, saldo in saldos.items():
-            if saldo > 0.01:
-                txt = f"{p}: debe recibir ${saldo:,.2f}"
-                st.write(f"- {txt}")
-                resumen_cuentas_txt.append(txt)
-            elif saldo < -0.01:
-                txt = f"{p}: debe pagar ${abs(saldo):,.2f}"
-                st.write(f"- {txt}")
-                resumen_cuentas_txt.append(txt)
-            else:
-                txt = f"{p}: al día ($0.00)"
-                st.write(f"- {txt}")
-                resumen_cuentas_txt.append(txt)
-                
-        if st.button("Eliminar último gasto"):
-            st.session_state.gastos = st.session_state.gastos.iloc[:-1].reset_index(drop=True)
-            guardar_datos(st.session_state.participantes, st.session_state.gastos)
-            st.rerun()
-            
-        st.markdown("---")
-        st.subheader("Enviar Detalle por WhatsApp")
-        
-        # Armar mensaje para WhatsApp estructurado de forma limpia y espaciada
-        lineas = []
-        lineas.append("RESUMEN DE GASTOS COMPARTIDOS")
-        lineas.append("")
-        lineas.append("DETALLE DE COMPRAS:")
-        lineas.append("")
-        
-        for index, row in st.session_state.gastos.iterrows():
-            num = index + 1
-            lineas.append(f"Gasto {num}:")
-            lineas
+            dividir_entre
