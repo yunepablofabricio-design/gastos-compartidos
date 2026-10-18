@@ -151,13 +151,14 @@ with pestanas[0]:
         st.markdown("---")
         st.subheader("Enviar Detalle por WhatsApp")
         
-        # Armar mensaje para WhatsApp bien espaciado
-        mensaje = "RESUMEN DE GASTOS COMPARTIDOS\n\n"
-        mensaje += "DETALLE DE COMPRAS:\n\n"
+        # Armar mensaje para WhatsApp estructurado de forma limpia y espaciada
+        lineas = []
+        lineas.append("RESUMEN DE GASTOS COMPARTIDOS")
+        lineas.append("")
+        lineas.append("DETALLE DE COMPRAS:")
+        lineas.append("")
         
         for index, row in st.session_state.gastos.iterrows():
             num = index + 1
-            mensaje += f"Gasto {num}:\n"
-            mensaje += f"- Fecha: {row['Fecha']}\n"
-            mensaje += f"- Descripción: {row['Descripción']}\n"
-            mensaje += f"- Pagado
+            lineas.append(f"Gasto {num}:")
+            lineas
