@@ -136,23 +136,25 @@ with pestanas[0]:
         st.metric("Gasto Total Acumulado", f"${total_general:,.2f}")
         
         saldos = {p["nombre"]: 0.0 for p in st.session_state.participantes}
-        detalle_personal = {p["nombre"]: [] for p in st.session_state.participantes}
+        gastos_totales_persona = {p["nombre"]: 0.0 for p in st.session_state.participantes}
         
         for _, row in st.session_state.gastos.iterrows():
             pagador = row["Pagado por"]
             monto = row["Monto"]
-            desc = row["Descripción"]
             beneficiarios = [p.strip() for p in row["Participantes"].split(",") if p.strip() in saldos]
             
             if beneficiarios:
                 cuota = monto / len(beneficiarios)
                 if pagador in saldos:
                     saldos[pagador] += monto
-                    detalle_personal[pagador].append(f"Pagó '{desc}' por ${monto:,.2f}")
+                    gastos_totales_persona[pagador] += monto
                 
                 for b in beneficiarios:
                     saldos[b] -= cuota
-                    detalle_personal[b].append(f"Consumió en '{desc}' (${cuota:,.2f})")
+
+        # Cálculo general equitativo por persona para mostrar en el mensaje
+        total_participantes_activos = len(st.session_state.participantes)
+        compartido_por_persona = total_general / total_participantes_activos if total_participantes_activos > 0 else 0
 
         st.markdown("---")
         st.write("**Estado de Cuentas por Persona:**")
@@ -160,32 +162,11 @@ with pestanas[0]:
         mapa_alias = {p["nombre"]: p["alias"] for p in st.session_state.participantes}
 
         for p_nombre, saldo in saldos.items():
-            alias_actual = mapa_alias.get(p_nombre, "")
-            
+            gasto_p = gastos_totales_persona.get(p_nombre, 0.0)
             if saldo > 0.01:
-                st.write(f"- **{p_nombre}**: debe recibir **${saldo:,.2f}** (Alias: {alias_actual if alias_actual else 'No configurado'})")
-                
-                msj_ind = f"Hola {p_nombre}, este es tu resumen de gastos.\n\n"
-                msj_ind += f"Tu saldo a favor es de: ${saldo:,.2f}\n"
-                msj_ind += f"Tus movimientos:\n"
-                for item in detalle_personal[p_nombre]:
-                    msj_ind += f"- {item}\n"
-                msj_ind += f"\nPara que te transfieran, tu alias registrado es: {alias_actual if alias_actual else '[Indicar Alias]'}"
-                
-                url_ind = f"https://api.whatsapp.com/send?text={urllib.parse.quote(msj_ind)}"
-                st.markdown(f'<a href="{url_ind}" target="_blank"><button style="background-color:#25D366; color:white; border:none; padding:6px 12px; border-radius:4px; font-size:13px; font-weight:bold; cursor:pointer; margin-bottom:10px;">Enviar WhatsApp a {p_nombre}</button></a>', unsafe_allow_html=True)
-
+                st.write(f"- **{p_nombre}**: gastó ${gasto_p:,.2f} y debe recibir **${saldo:,.2f}**")
             elif saldo < -0.01:
                 st.write(f"- **{p_nombre}**: debe pagar **${abs(saldo):,.2f}**")
-                
-                msj_ind = f"Hola {p_nombre}, este es tu resumen de gastos.\n\n"
-                msj_ind += f"Debes abonar la suma de: ${abs(saldo):,.2f}\n\n"
-                msj_ind += f"Tus consumos y gastos registrados:\n"
-                for item in detalle_personal[p_nombre]:
-                    msj_ind += f"- {item}\n"
-                
-                url_ind = f"https://api.whatsapp.com/send?text={urllib.parse.quote(msj_ind)}"
-                st.markdown(f'<a href="{url_ind}" target="_blank"><button style="background-color:#25D366; color:white; border:none; padding:6px 12px; border-radius:4px; font-size:13px; font-weight:bold; cursor:pointer; margin-bottom:10px;">Enviar WhatsApp a {p_nombre}</button></a>', unsafe_allow_html=True)
             else:
                 st.write(f"- **{p_nombre}**: al día ($0.00)")
                 
@@ -195,44 +176,33 @@ with pestanas[0]:
             st.rerun()
             
         st.markdown("---")
-        st.subheader("Enviar Resumen Corto al Grupo de WhatsApp")
+        st.subheader("Enviar Resumen al Grupo de WhatsApp")
         
         lineas = []
         lineas.append("RESUMEN DE GASTOS")
         lineas.append("")
         lineas.append("COMPRAS:")
-        lineas.append("")
-        
         for index, row in st.session_state.gastos.iterrows():
-            lineas.append(f"- {row['Descripción']} (${row['Monto']:,.2f} pagado por {row['Pagado por']})")
-            lineas.append("")
+            lineas.append(f"• {row['Descripción']} (${row['Monto']:,.2f} pagado por {row['Pagado por']})")
             
+        lineas.append("")
         lineas.append(f"TOTAL: ${total_general:,.2f}")
+        lineas.append(f"Compartido por persona: ${compartido_por_persona:,.2f}")
         lineas.append("")
-        lineas.append("DETALLE POR PERSONA:")
-        lineas.append("")
-        for p_nombre in nombres_participantes:
-            lineas.append(f"*{p_nombre}*:")
-            if detalle_personal[p_nombre]:
-                for mov in detalle_personal[p_nombre]:
-                    lineas.append(f"  - {mov}")
-            else:
-                lineas.append("  - Sin movimientos")
-            lineas.append("")
-
         lineas.append("SALDOS:")
+        
         for p_nombre, saldo in saldos.items():
+            gasto_p = gastos_totales_persona.get(p_nombre, 0.0)
             if saldo > 0.01:
-                alias_txt = f" (Alias: {mapa_alias.get(p_nombre, '')})" if mapa_alias.get(p_nombre, '') else ""
-                lineas.append(f"- {p_nombre}: recibe ${saldo:,.2f}{alias_txt}")
+                lineas.append(f"• {p_nombre}: gastó ${gasto_p:,.2f} y debe recibir ${saldo:,.2f}")
             elif saldo < -0.01:
-                lineas.append(f"- {p_nombre}: debe ${abs(saldo):,.2f}")
+                lineas.append(f"• {p_nombre}: debe ${abs(saldo):,.2f}")
             else:
-                lineas.append(f"- {p_nombre}: al día")
+                lineas.append(f"• {p_nombre}: al día")
             
         mensaje_grupo = "\n".join(lineas)
         
         url_whatsapp_grupo = f"https://api.whatsapp.com/send?text={urllib.parse.quote(mensaje_grupo)}"
-        st.markdown(f'<a href="{url_whatsapp_grupo}" target="_blank"><button style="background-color:#25D366; color:white; border:none; padding:10px 20px; border-radius:5px; font-weight:bold; cursor:pointer; width:100%;">Enviar Resumen Corto al Grupo</button></a>', unsafe_allow_html=True)
+        st.markdown(f'<a href="{url_whatsapp_grupo}" target="_blank"><button style="background-color:#25D366; color:white; border:none; padding:10px 20px; border-radius:5px; font-weight:bold; cursor:pointer; width:100%;">Enviar Resumen al Grupo</button></a>', unsafe_allow_html=True)
     else:
         st.info("Aún no hay gastos registrados.")
