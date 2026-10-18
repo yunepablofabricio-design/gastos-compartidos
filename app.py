@@ -25,7 +25,7 @@ def cargar_datos():
         try:
             with open(DATA_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                participantes = data.get("participantes", ["Participante 1", "Participante 2"])
+                participantes = data.get("participantes", ["Pablo", "Gerardo", "Emanuel", "Nico"])
                 gastos_dict = data.get("gastos", [])
                 gastos = pd.DataFrame(gastos_dict)
                 if gastos.empty:
@@ -33,7 +33,7 @@ def cargar_datos():
                 return participantes, gastos
         except:
             pass
-    return ["Participante 1", "Participante 2"], pd.DataFrame(columns=["Fecha", "Descripción", "Pagado por", "Monto", "Participantes"])
+    return ["Pablo", "Gerardo", "Emanuel", "Nico"], pd.DataFrame(columns=["Fecha", "Descripción", "Pagado por", "Monto", "Participantes"])
 
 def guardar_datos(participantes, gastos):
     data = {
@@ -48,10 +48,9 @@ if 'participantes' not in st.session_state or 'gastos' not in st.session_state:
     st.session_state.participantes = p
     st.session_state.gastos = g
 
-# Pestañas en el orden original
-pestanas = st.tabs(["📊 Resumen & WhatsApp", "💸 Registrar Gasto", "👥 Participantes"])
+pestanas = st.tabs(["Resumen & WhatsApp", "Registrar Gasto", "Participantes"])
 
-# Pestaña de Participantes
+# Pestaña 3: Participantes
 with pestanas[2]:
     st.subheader("Configuración de Participantes")
     nuevo_participante = st.text_input("Nombre del nuevo participante")
@@ -67,7 +66,7 @@ with pestanas[2]:
                 st.warning("Ese participante ya existe.")
     with col2:
         if st.button("Reiniciar lista"):
-            st.session_state.participantes = ["Participante 1", "Participante 2"]
+            st.session_state.participantes = ["Pablo", "Gerardo", "Emanuel", "Nico"]
             guardar_datos(st.session_state.participantes, st.session_state.gastos)
             st.rerun()
 
@@ -75,7 +74,7 @@ with pestanas[2]:
     for p in st.session_state.participantes:
         st.write(f"- {p}")
 
-# Pestaña de Registrar Gasto
+# Pestaña 2: Registrar Gasto
 with pestanas[1]:
     st.subheader("Registrar Nuevo Gasto")
     if len(st.session_state.participantes) == 0:
@@ -104,45 +103,40 @@ with pestanas[1]:
                 else:
                     st.error("Por favor complete todos los campos y seleccione participantes.")
 
-# Pestaña de Resumen & WhatsApp
+# Pestaña 1: Resumen & WhatsApp
 with pestanas[0]:
     st.subheader("Resumen de Cuentas")
     if len(st.session_state.gastos) > 0:
-        st.write("**Detalle de Compras:**")
+        st.write("**Detalle de Gastos:**")
         st.dataframe(st.session_state.gastos, use_container_width=True)
         
         total_general = st.session_state.gastos["Monto"].sum()
         st.metric("Gasto Total Acumulado", f"${total_general:,.2f}")
         
-        # Cálculo de saldos / cuánto debe cada uno (como en la primera versión)
-        saldos = {p: 0.0 for p in st.session_state.participantes}
+        # Calcular cuánto pagó cada uno y cuánto le corresponde en total
+        total_pagado_por = {p: 0.0 for p in st.session_state.participantes}
+        total_corresponde_a = {p: 0.0 for p in st.session_state.participantes}
+        
         for _, row in st.session_state.gastos.iterrows():
             pagador = row["Pagado por"]
             monto = row["Monto"]
-            beneficiarios = [p.strip() for p in row["Participantes"].split(",") if p.strip() in saldos]
+            beneficiarios = [p.strip() for p in row["Participantes"].split(",") if p.strip() in st.session_state.participantes]
+            
+            if pagador in total_pagado_por:
+                total_pagado_por[pagador] += monto
+                
             if beneficiarios:
                 cuota = monto / len(beneficiarios)
-                if pagador in saldos:
-                    saldos[pagador] += monto
                 for b in beneficiarios:
-                    saldos[b] -= cuota
+                    if b in total_corresponde_a:
+                        total_corresponde_a[b] += cuota
 
         st.markdown("---")
-        st.write("**Estado de Cuentas por Persona:**")
-        resumen_cuentas_txt = []
-        for p, saldo in saldos.items():
-            if saldo > 0.01:
-                txt = f"{p}: debe recibir ${saldo:,.2f}"
-                st.write(f"- {txt}")
-                resumen_cuentas_txt.append(txt)
-            elif saldo < -0.01:
-                txt = f"{p}: debe pagar ${abs(saldo):,.2f}"
-                st.write(f"- {txt}")
-                resumen_cuentas_txt.append(txt)
-            else:
-                txt = f"{p}: al día ($0.00)"
-                st.write(f"- {txt}")
-                resumen_cuentas_txt.append(txt)
+        st.write("**Balance por Participante:**")
+        for p in st.session_state.participantes:
+            pagado = total_pagado_por.get(p, 0.0)
+            corresponde = total_corresponde_a.get(p, 0.0)
+            st.write(f"- {p}: Pagó ${pagado:,.2f} | Le corresponde: ${corresponde:,.2f}")
                 
         if st.button("Eliminar último gasto"):
             st.session_state.gastos = st.session_state.gastos.iloc[:-1].reset_index(drop=True)
@@ -152,31 +146,32 @@ with pestanas[0]:
         st.markdown("---")
         st.subheader("Enviar Detalle por WhatsApp")
         
-        # Armado de mensaje formal, sin iconos, sin tipo y con amplio espaciado
+        # Armado del mensaje exacto de la foto, sin iconos y más espaciado
         lineas = []
         lineas.append("RESUMEN DE GASTOS COMPARTIDOS")
         lineas.append("")
-        lineas.append("DETALLE DE COMPRAS:")
+        lineas.append("DETALLE DE GASTOS:")
         lineas.append("")
         
         for index, row in st.session_state.gastos.iterrows():
-            num = index + 1
-            lineas.append(f"Gasto {num}:")
             lineas.append(f"- Fecha: {row['Fecha']}")
-            lineas.append(f"- Descripción: {row['Descripción']}")
-            lineas.append(f"- Pagado por: {row['Pagado por']}")
-            lineas.append(f"- Monto: ${row['Monto']:,.2f}")
-            lineas.append(f"- Dividido entre: {row['Participantes']}")
+            lineas.append(f"Descripción: {row['Descripción']}")
+            lineas.append(f"Pagado por: {row['Pagado por']}")
+            lineas.append(f"Monto: ${row['Monto']:,.2f}")
+            lineas.append(f"Dividido entre: {row['Participantes']}")
             lineas.append("")
             lineas.append("")
             
-        lineas.append("----------------------------------")
-        lineas.append("")
         lineas.append(f"TOTAL GENERAL: ${total_general:,.2f}")
         lineas.append("")
-        lineas.append("ESTADO DE CUENTAS:")
-        for r in resumen_cuentas_txt:
-            lineas.append(f"- {r}")
+        lineas.append("")
+        lineas.append("BALANCE POR PARTICIPANTE:")
+        lineas.append("")
+        
+        for p in st.session_state.participantes:
+            pagado = total_pagado_por.get(p, 0.0)
+            corresponde = total_corresponde_a.get(p, 0.0)
+            lineas.append(f"- {p}: Pagó ${pagado:,.2f} | Le corresponde: ${corresponde:,.2f}")
             
         mensaje = "\n".join(lineas)
         
