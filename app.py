@@ -26,6 +26,8 @@ def cargar_datos():
             with open(DATA_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 participantes = data.get("participantes", ["Pablo", "Mel"])
+                alias_general = data.get("alias_general", "")
+                
                 if participantes and isinstance(participantes[0], str):
                     participantes = [{"nombre": p, "alias": ""} for p in participantes]
                 
@@ -39,23 +41,25 @@ def cargar_datos():
                         break
                 if gastos.empty:
                     gastos = pd.DataFrame(columns=cols_requeridas)
-                return participantes, gastos
+                return participantes, gastos, alias_general
         except:
             pass
-    return [{"nombre": "Pablo", "alias": ""}, {"nombre": "Mel", "alias": ""}], pd.DataFrame(columns=["Fecha", "Descripción", "Pagado por", "Monto", "Participantes"])
+    return [{"nombre": "Pablo", "alias": ""}, {"nombre": "Mel", "alias": ""}], pd.DataFrame(columns=["Fecha", "Descripción", "Pagado por", "Monto", "Participantes"]), ""
 
-def guardar_datos(participantes, gastos):
+def guardar_datos(participantes, gastos, alias_general):
     data = {
         "participantes": participantes,
-        "gastos": gastos.to_dict(orient="records")
+        "gastos": gastos.to_dict(orient="records"),
+        "alias_general": alias_general
     }
     with open(DATA_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
 
-if 'participantes' not in st.session_state or 'gastos' not in st.session_state:
-    p, g = cargar_datos()
+if 'participantes' not in st.session_state or 'gastos' not in st.session_state or 'alias_general' not in st.session_state:
+    p, g, a = cargar_datos()
     st.session_state.participantes = p
     st.session_state.gastos = g
+    st.session_state.alias_general = a
 
 pestanas = st.tabs(["📊 Resumen & WhatsApp", "💸 Registrar Gasto", "👥 Participantes"])
 
@@ -63,39 +67,32 @@ nombres_participantes = [p["nombre"] for p in st.session_state.participantes]
 
 # Pestaña de Participantes
 with pestanas[2]:
-    st.subheader("Configuración de Participantes y Alias")
+    st.subheader("Configuración de Participantes")
     
     with st.form("form_participante"):
         nuevo_participante = st.text_input("Nombre del nuevo participante")
-        nuevo_alias = st.text_input("Alias de transferencia (CBU / CVU / MP)")
         submit_p = st.form_submit_button("Agregar participante")
         if submit_p:
             if nuevo_participante and nuevo_participante not in nombres_participantes:
-                st.session_state.participantes.append({"nombre": nuevo_participante, "alias": nuevo_alias})
-                guardar_datos(st.session_state.participantes, st.session_state.gastos)
+                st.session_state.participantes.append({"nombre": nuevo_participante, "alias": ""})
+                guardar_datos(st.session_state.participantes, st.session_state.gastos, st.session_state.alias_general)
                 st.success("Se agregó a " + nuevo_participante)
                 st.rerun()
             elif nuevo_participante in nombres_participantes:
                 st.warning("Ese participante ya existe.")
 
     st.markdown("---")
-    st.write("**Editar Alias de Participantes Actuales:**")
+    st.write("**Lista de Participantes:**")
     
     for i, p in enumerate(st.session_state.participantes):
-        col_a, col_b, col_c = st.columns([2, 2, 1])
+        col_a, col_b = st.columns([3, 1])
         with col_a:
             st.text("Nombre: " + p['nombre'])
         with col_b:
-            nuevo_alias_val = st.text_input("Alias de " + p['nombre'], value=p['alias'], key="alias_tab_" + str(i))
-            if nuevo_alias_val != p['alias']:
-                st.session_state.participantes[i]['alias'] = nuevo_alias_val
-                guardar_datos(st.session_state.participantes, st.session_state.gastos)
-        with col_c:
-            st.write("")
             if st.button("Eliminar", key="del_" + str(i)):
                 if len(st.session_state.participantes) > 1:
                     st.session_state.participantes.pop(i)
-                    guardar_datos(st.session_state.participantes, st.session_state.gastos)
+                    guardar_datos(st.session_state.participantes, st.session_state.gastos, st.session_state.alias_general)
                     st.rerun()
                 else:
                     st.error("Debe quedar al menos un participante.")
@@ -103,7 +100,8 @@ with pestanas[2]:
     if st.button("Reiniciar datos y lista"):
         st.session_state.participantes = [{"nombre": "Pablo", "alias": ""}, {"nombre": "Mel", "alias": ""}]
         st.session_state.gastos = pd.DataFrame(columns=["Fecha", "Descripción", "Pagado por", "Monto", "Participantes"])
-        guardar_datos(st.session_state.participantes, st.session_state.gastos)
+        st.session_state.alias_general = ""
+        guardar_datos(st.session_state.participantes, st.session_state.gastos, st.session_state.alias_general)
         st.rerun()
 
 # Pestaña de Registrar Gasto
@@ -130,7 +128,7 @@ with pestanas[1]:
                         "Participantes": [", ".join(dividir_entre)]
                     })
                     st.session_state.gastos = pd.concat([st.session_state.gastos, nuevo_gasto], ignore_index=True)
-                    guardar_datos(st.session_state.participantes, st.session_state.gastos)
+                    guardar_datos(st.session_state.participantes, st.session_state.gastos, st.session_state.alias_general)
                     st.success("Gasto registrado exitosamente.")
                 else:
                     st.error("Por favor complete todos los campos y seleccione participantes.")
@@ -139,13 +137,14 @@ with pestanas[1]:
 with pestanas[0]:
     st.subheader("Resumen de Cuentas")
     
-    # Permitir modificar alias también de forma rápida desde la primera pestaña
-    with st.expander("Modificar Alias de Participantes"):
-        for i, p in enumerate(st.session_state.participantes):
-            alias_rapido = st.text_input("Alias para " + p['nombre'], value=p['alias'], key="alias_res_" + str(i))
-            if alias_rapido != p['alias']:
-                st.session_state.participantes[i]['alias'] = alias_rapido
-                guardar_datos(st.session_state.participantes, st.session_state.gastos)
+    # Campo para modificar el Alias fácilmente desde la app
+    alias_input = st.text_input("Configurar Alias de cobro (ej: viaje.amigos.mp)", value=st.session_state.alias_general)
+    if alias_input != st.session_state.alias_general:
+        st.session_state.alias_general = alias_input
+        guardar_datos(st.session_state.participantes, st.session_state.gastos, st.session_state.alias_general)
+        st.success("Alias actualizado correctamente.")
+
+    st.markdown("---")
 
     if len(st.session_state.gastos) > 0:
         st.write("**Detalle de Compras:**")
@@ -177,91 +176,45 @@ with pestanas[0]:
 
         st.markdown("---")
         st.write("**Estado de Cuentas por Persona:**")
-        
-        mapa_alias = {p["nombre"]: p["alias"] for p in st.session_state.participantes}
 
         for p_nombre, saldo in saldos.items():
-            alias_actual = mapa_alias.get(p_nombre, "")
-            
             if saldo > 0.01:
-                st.write("- **" + p_nombre + "**: debe recibir **$" + f"{saldo:,.2f}" + "** (Alias: " + (alias_actual if alias_actual else 'No configurado') + ")")
-                
-                msj_ind = "Hola " + p_nombre + ", este es tu resumen de gastos.\n\n"
-                msj_ind += "Tu saldo a favor es de: $" + f"{saldo:,.2f}" + "\n"
-                msj_ind += "Tus movimientos:\n"
-                for item in detalle_personal[p_nombre]:
-                    msj_ind += "- " + item + "\n"
-                msj_ind += "\nPara que te transfieran, tu alias es: " + (alias_actual if alias_actual else '[Indicar Alias]')
-                
-                url_ind = "https://api.whatsapp.com/send?text=" + urllib.parse.quote(msj_ind)
-                st.markdown('<a href="' + url_ind + '" target="_blank"><button style="background-color:#25D366; color:white; border:none; padding:6px 12px; border-radius:4px; font-size:13px; font-weight:bold; cursor:pointer; margin-bottom:10px;">Enviar WhatsApp a ' + p_nombre + '</button></a>', unsafe_allow_html=True)
-
+                st.write("- **" + p_nombre + "**: recupera **$" + f"{saldo:,.2f}" + "**")
             elif saldo < -0.01:
-                st.write("- **" + p_nombre + "**: debe pagar **$" + f"{abs(saldo):,.2f}" + "**")
-                
-                msj_ind = "Hola " + p_nombre + ", este es tu resumen de gastos.\n\n"
-                msj_ind += "Debes abonar la suma de: $" + f"{abs(saldo):,.2f}" + "\n\n"
-                msj_ind += "Tus consumos y gastos registrados:\n"
-                for item in detalle_personal[p_nombre]:
-                    msj_ind += "- " + item + "\n"
-                
-                # Mostrar también a quién debe transferir con su respectivo alias si hay alguien a favor
-                msj_ind += "\nPuedes transferir a los siguientes alias:\n"
-                for otro_p, otro_saldo in saldos.items():
-                    if otro_saldo > 0.01:
-                        a_ext = mapa_alias.get(otro_p, '[Sin alias]')
-                        msj_ind += f"- {otro_p}: {a_ext}\n"
-
-                url_ind = "https://api.whatsapp.com/send?text=" + urllib.parse.quote(msj_ind)
-                st.markdown('<a href="' + url_ind + '" target="_blank"><button style="background-color:#25D366; color:white; border:none; padding:6px 12px; border-radius:4px; font-size:13px; font-weight:bold; cursor:pointer; margin-bottom:10px;">Enviar WhatsApp a ' + p_nombre + '</button></a>', unsafe_allow_html=True)
+                st.write("- **" + p_nombre + "**: debe **$" + f"{abs(saldo):,.2f}" + "**")
             else:
                 st.write("- **" + p_nombre + "**: al día ($0.00)")
                 
         if st.button("Eliminar último gasto"):
             st.session_state.gastos = st.session_state.gastos.iloc[:-1].reset_index(drop=True)
-            guardar_datos(st.session_state.participantes, st.session_state.gastos)
+            guardar_datos(st.session_state.participantes, st.session_state.gastos, st.session_state.alias_general)
             st.rerun()
             
         st.markdown("---")
-        st.subheader("Enviar Resumen Corto al Grupo de WhatsApp")
+        st.subheader("Enviar Resumen por WhatsApp")
         
+        # Construcción del mensaje con el formato de la imagen
         lineas = []
-        lineas.append("RESUMEN DE GASTOS")
-        lineas.append("")
-        lineas.append("COMPRAS:")
+        lineas.append("💸 RESUMEN GENERAL DE GASTOS 💸")
         lineas.append("")
         
-        for index, row in st.session_state.gastos.iterrows():
-            lineas.append("- " + str(row['Descripción']) + " ($" + f"{float(row['Monto']):,.2f}" + " pagado por " + str(row['Pagado por']) + ")")
-            lineas.append("")
-            
-        lineas.append("TOTAL: $" + f"{total_general:,.2f}")
-        lineas.append("")
-        lineas.append("DETALLE POR PERSONA:")
-        lineas.append("")
-        for p_nombre in nombres_participantes:
-            lineas.append("*" + p_nombre + "*:")
-            if detalle_personal[p_nombre]:
-                for mov in detalle_personal[p_nombre]:
-                    lineas.append("  - " + mov)
-            else:
-                lineas.append("  - Sin movimientos")
-            lineas.append("")
-
-        lineas.append("SALDOS Y ALIAS PARA TRANSFERIR:")
         for p_nombre, saldo in saldos.items():
-            alias_val = mapa_alias.get(p_nombre, '')
-            alias_txt = f" (Alias: {alias_val})" if alias_val else " (Alias: [No configurado])"
             if saldo > 0.01:
-                lineas.append("- " + p_nombre + ": recibe $" + f"{saldo:,.2f}" + alias_txt)
+                lineas.append("• " + p_nombre + ": Recupera $" + f"{saldo:,.2f}")
             elif saldo < -0.01:
-                lineas.append("- " + p_nombre + ": debe $" + f"{abs(saldo):,.2f}")
+                lineas.append("• " + p_nombre + ": Debe $" + f"{abs(saldo):,.2f}")
             else:
-                lineas.append("- " + p_nombre + ": al día" + alias_txt)
+                lineas.append("• " + p_nombre + ": Al día ($0.00)")
+            
+        lineas.append("")
+        if st.session_state.alias_general:
+            lineas.append("📌 Alias MP: " + st.session_state.alias_general)
+        else:
+            lineas.append("📌 Alias MP: [Sin configurar]")
             
         mensaje_grupo = "\n".join(lineas)
         
         url_whatsapp_grupo = "https://api.whatsapp.com/send?text=" + urllib.parse.quote(mensaje_grupo)
-        st.markdown('<a href="' + url_whatsapp_grupo + '" target="_blank"><button style="background-color:#25D366; color:white; border:none; padding:10px 20px; border-radius:5px; font-weight:bold; cursor:pointer; width:100%;">Enviar Resumen Corto al Grupo</button></a>', unsafe_allow_html=True)
+        st.markdown('<a href="' + url_whatsapp_grupo + '" target="_blank"><button style="background-color:#25D366; color:white; border:none; padding:10px 20px; border-radius:5px; font-weight:bold; cursor:pointer; width:100%;">Enviar Resumen a WhatsApp</button></a>', unsafe_allow_html=True)
     else:
         st.info("Aún no hay gastos registrados.")
