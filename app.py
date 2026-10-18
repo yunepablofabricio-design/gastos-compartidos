@@ -25,7 +25,7 @@ def cargar_datos():
         try:
             with open(DATA_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                participantes = data.get("participantes", ["Pablo", "Mel"])
+                participantes = data.get("participantes", ["Pablo", "Gerardo", "Emanuel", "Nico"])
                 if participantes and isinstance(participantes[0], str):
                     participantes = [{"nombre": p, "alias": ""} for p in participantes]
                 
@@ -42,7 +42,12 @@ def cargar_datos():
                 return participantes, gastos
         except:
             pass
-    return [{"nombre": "Pablo", "alias": ""}, {"nombre": "Mel", "alias": ""}], pd.DataFrame(columns=["Fecha", "Descripción", "Pagado por", "Monto", "Participantes"])
+    return [
+        {"nombre": "Pablo", "alias": ""},
+        {"nombre": "Gerardo", "alias": ""},
+        {"nombre": "Emanuel", "alias": ""},
+        {"nombre": "Nico", "alias": ""}
+    ], pd.DataFrame(columns=["Fecha", "Descripción", "Pagado por", "Monto", "Participantes"])
 
 def guardar_datos(participantes, gastos):
     data = {
@@ -100,7 +105,12 @@ with pestanas[2]:
                     st.error("Debe quedar al menos un participante.")
 
     if st.button("Reiniciar datos y lista"):
-        st.session_state.participantes = [{"nombre": "Pablo", "alias": ""}, {"nombre": "Mel", "alias": ""}]
+        st.session_state.participantes = [
+            {"nombre": "Pablo", "alias": ""},
+            {"nombre": "Gerardo", "alias": ""},
+            {"nombre": "Emanuel", "alias": ""},
+            {"nombre": "Nico", "alias": ""}
+        ]
         st.session_state.gastos = pd.DataFrame(columns=["Fecha", "Descripción", "Pagado por", "Monto", "Participantes"])
         guardar_datos(st.session_state.participantes, st.session_state.gastos)
         st.rerun()
@@ -147,6 +157,9 @@ with pestanas[0]:
         consumo_por_persona = {p["nombre"]: 0.0 for p in st.session_state.participantes}
         detalle_personal = {p["nombre"]: [] for p in st.session_state.participantes}
         
+        # Identificar personas activas involucradas en los gastos registrados
+        personas_involucradas = set()
+
         for _, row in st.session_state.gastos.iterrows():
             pagador = str(row["Pagado por"])
             monto = float(row["Monto"])
@@ -156,12 +169,18 @@ with pestanas[0]:
             
             if pagador in pagado_por_persona:
                 pagado_por_persona[pagador] += monto
+                personas_involucradas.add(pagador)
                 
             if beneficiarios:
                 cuota = monto / len(beneficiarios)
                 for b in beneficiarios:
                     consumo_por_persona[b] += cuota
-                    detalle_personal[b].append(desc + ": $" + f"{cuota:,.2f}")
+                    detalle_personal[b].append(desc + " ($" + f"{cuota:,.2f}" + ")")
+                    personas_involucradas.add(b)
+
+        # Cálculo de promedio por persona involucrada
+        cant_personas = len(personas_involucradas) if len(personas_involucradas) > 0 else len(nombres_participantes)
+        compartido_por_persona = total_general / cant_personas if cant_personas > 0 else 0.0
 
         saldos = {}
         for p_nombre in nombres_participantes:
@@ -176,7 +195,7 @@ with pestanas[0]:
             alias_actual = mapa_alias.get(p_nombre, "")
             
             if saldo > 0.01:
-                st.write("- **" + p_nombre + "**: debe recibir **$" + f"{saldo:,.2f}" + "** (Alias: " + (alias_actual if alias_actual else 'No configurado') + ")")
+                st.write("- **" + p_nombre + "**: gastó $" + f"{pagado_por_persona[p_nombre]:,.2f}" + " y debe recibir **$" + f"{saldo:,.2f}" + "** (Alias: " + (alias_actual if alias_actual else 'No configurado') + ")")
                 
                 msj_ind = "Hola " + p_nombre + ", este es tu resumen de gastos.\n\n"
                 msj_ind += "Tu saldo a favor a recibir es de: $" + f"{saldo:,.2f}" + "\n\n"
@@ -192,7 +211,8 @@ with pestanas[0]:
 
             elif saldo < -0.01:
                 deuda = abs(saldo)
-                st.write("- **" + p_nombre + "**: debe pagar **$" + f"{deuda:,.2f}" + "**")
+                txt_gasto = (" gastó $" + f"{pagado_por_persona[p_nombre]:,.2f}" + " y") if pagado_por_persona[p_nombre] > 0 else ""
+                st.write("- **" + p_nombre + "**: " + txt_gasto + " debe pagar **$" + f"{deuda:,.2f}" + "**")
                 
                 msj_ind = "Hola " + p_nombre + ", este es tu resumen de gastos.\n\n"
                 msj_ind += "Debes abonar: $" + f"{deuda:,.2f}" + "\n\n"
@@ -220,36 +240,31 @@ with pestanas[0]:
         lineas.append("RESUMEN DE GASTOS")
         lineas.append("")
         lineas.append("COMPRAS:")
-        lineas.append("")
         
         for index, row in st.session_state.gastos.iterrows():
             lineas.append("- " + str(row['Descripción']) + " ($" + f"{float(row['Monto']):,.2f}" + " pagado por " + str(row['Pagado por']) + ")")
-            lineas.append("")
             
-        lineas.append("TOTAL GENERAL: $" + f"{total_general:,.2f}")
         lineas.append("")
-        lineas.append("CONSUMO Y CORRESPONDIENTE POR PERSONA:")
+        lineas.append("TOTAL: $" + f"{total_general:,.2f}")
+        lineas.append("Compartido por persona: $" + f"{compartido_por_persona:,.2f}")
         lineas.append("")
+        lineas.append("SALDOS:")
+        
         for p_nombre in nombres_participantes:
-            lineas.append("*" + p_nombre + "*:")
-            lineas.append("  - Total consumido: $" + f"{consumo_por_persona[p_nombre]:,.2f}")
-            if detalle_personal[p_nombre]:
-                for mov in detalle_personal[p_nombre]:
-                    lineas.append("    • " + mov)
-            else:
-                lineas.append("    • Sin consumos")
-            lineas.append("")
-
-        lineas.append("SALDOS FINAL A ABONAR / RECIBIR:")
-        for p_nombre, saldo in saldos.items():
+            saldo = saldos[p_nombre]
+            gasto_previo = pagado_por_persona[p_nombre]
+            
+            # Solo incluir personas que gastaron o que deben/reciben
             if saldo > 0.01:
                 alias_txt = " (Alias: " + mapa_alias.get(p_nombre, '') + ")" if mapa_alias.get(p_nombre, '') else ""
-                lineas.append("- " + p_nombre + ": recibe $" + f"{saldo:,.2f}" + alias_txt)
+                txt_gasto = "gastó $" + f"{gasto_previo:,.2f}" + " y " if gasto_previo > 0 else ""
+                lineas.append("- " + p_nombre + ": " + txt_gasto + "debe recibir $" + f"{saldo:,.2f}" + alias_txt)
             elif saldo < -0.01:
-                lineas.append("- " + p_nombre + ": debe $" + f"{abs(saldo):,.2f}")
-            else:
+                txt_gasto = "gastó $" + f"{gasto_previo:,.2f}" + " y " if gasto_previo > 0 else ""
+                lineas.append("- " + p_nombre + ": " + txt_gasto + "debe $" + f"{abs(saldo):,.2f}")
+            elif gasto_previo > 0 or p_nombre in personas_involucradas:
                 lineas.append("- " + p_nombre + ": al día")
-            
+
         mensaje_grupo = "\n".join(lineas)
         
         url_whatsapp_grupo = "https://api.whatsapp.com/send?text=" + urllib.parse.quote(mensaje_grupo)
