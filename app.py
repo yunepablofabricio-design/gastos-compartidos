@@ -4,7 +4,7 @@ import numpy as np
 from datetime import datetime
 import urllib.parse
 
-# Configuración de página
+# Configuración de la página
 st.set_page_config(page_title="Divisor de Gastos & WhatsApp", page_icon="💸", layout="centered")
 
 # Estilos CSS
@@ -18,9 +18,9 @@ st.markdown("""
 st.title("Divisor de Gastos & WhatsApp")
 st.markdown("---")
 
-# 1. PERSISTENCIA: Mantener participantes y gastos guardados en la sesión
+# Inicialización del estado (comienza vacío si no hay participantes guardados)
 if 'participantes' not in st.session_state:
-    st.session_state.participantes = ["Participante 1", "Participante 2"]
+    st.session_state.participantes = []
 
 if 'gastos' not in st.session_state:
     st.session_state.gastos = pd.DataFrame(columns=["Fecha", "Descripción", "Pagado por", "Monto", "Participantes"])
@@ -31,34 +31,46 @@ tab1, tab2, tab3 = st.tabs(["📊 Resumen & WhatsApp", "💸 Registrar Gasto", "
 # --- PESTAÑA 3: PARTICIPANTES ---
 with tab3:
     st.subheader("Configuración de Participantes")
-    nuevo_p = st.text_input("Nombre del nuevo participante")
     
-    col1, col2 = st.columns(2)
-    with col1:
+    nuevo_p = st.text_input("Nombre del participante")
+    
+    col_add, col_clear = st.columns(2)
+    with col_add:
         if st.button("Agregar Participante"):
-            if nuevo_p and nuevo_p not in st.session_state.participantes:
-                st.session_state.participantes.append(nuevo_p)
-                st.success(f"Se agregó a {nuevo_p}")
+            if nuevo_p and nuevo_p.strip() not in st.session_state.participantes:
+                st.session_state.participantes.append(nuevo_p.strip())
+                st.success(f"Se agregó a {nuevo_p.strip()}")
                 st.rerun()
-            elif nuevo_p in st.session_state.participantes:
-                st.warning("El participante ya existe.")
+            elif nuevo_p.strip() in st.session_state.participantes:
+                st.warning("El participante ya está en la lista.")
     
-    with col2:
-        if st.button("Reiniciar Lista"):
-            st.session_state.participantes = ["Participante 1", "Participante 2"]
+    with col_clear:
+        if st.button("Vaciar Lista"):
+            st.session_state.participantes = []
             st.rerun()
             
     st.markdown("---")
-    st.write("**Lista de Participantes:**")
-    for p in st.session_state.participantes:
-        st.write(f"- {p}")
+    st.write("**Lista Actual de Participantes:**")
+    
+    if len(st.session_state.participantes) == 0:
+        st.info("No hay participantes registrados. Agrega uno arriba.")
+    else:
+        # Permitir eliminar participantes individualmente
+        for i, p in enumerate(st.session_state.participantes):
+            col_nombre, col_borrar = st.columns([3, 1])
+            with col_nombre:
+                st.write(f"• {p}")
+            with col_borrar:
+                if st.button("Eliminar", key=f"del_{i}"):
+                    st.session_state.participantes.pop(i)
+                    st.rerun()
 
 # --- PESTAÑA 2: REGISTRAR GASTO ---
 with tab2:
     st.subheader("Registrar Nuevo Gasto")
     
     if len(st.session_state.participantes) == 0:
-        st.warning("Por favor agregue al menos un participante.")
+        st.warning("Por favor agrega al menos un participante en la pestaña '👥 Participantes'.")
     else:
         with st.form("form_gasto", clear_on_submit=True):
             descripcion = st.text_input("Descripción del gasto")
@@ -89,7 +101,6 @@ with tab1:
     
     if len(st.session_state.gastos) > 0:
         st.write("**Historial de Gastos:**")
-        # Mostrar tabla limpia sin columnas de tipo ni emojis
         st.dataframe(st.session_state.gastos, use_container_width=True)
         
         total_acumulado = st.session_state.gastos["Monto"].sum()
@@ -102,7 +113,7 @@ with tab1:
         st.markdown("---")
         st.subheader("Enviar Detalle por WhatsApp")
         
-        # 2. FORMATO FORMAL: Sin emojis ni tipos de clasificación
+        # Mensaje formal para WhatsApp sin emojis ni clasificaciones de tipo
         mensaje = "RESUMEN DE GASTOS COMPARTIDOS\n\n"
         for idx, row in st.session_state.gastos.iterrows():
             mensaje += f"- Fecha: {row['Fecha']}\n"
