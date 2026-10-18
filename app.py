@@ -25,9 +25,14 @@ def cargar_datos():
         try:
             with open(DATA_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                participantes = data.get("participantes", ["Pablo", "Gerardo", "Emanuel", "Nico"])
+                participantes = data.get("participantes", [
+                    {"nombre": "Pablo", "alias": "pabloyune"},
+                    {"nombre": "Gerardo", "alias": ""},
+                    {"nombre": "Emanuel", "alias": ""},
+                    {"nombre": "Nico", "alias": ""}
+                ])
                 if participantes and isinstance(participantes[0], str):
-                    participantes = [{"nombre": p, "alias": ""} for p in participantes]
+                    participantes = [{"nombre": p, "alias": "pabloyune" if p.lower() == "pablo" else ""} for p in participantes]
                 
                 gastos_dict = data.get("gastos", [])
                 gastos = pd.DataFrame(gastos_dict)
@@ -36,7 +41,12 @@ def cargar_datos():
                 return participantes, gastos
         except:
             pass
-    return [{"nombre": "Pablo", "alias": ""}, {"nombre": "Gerardo", "alias": ""}, {"nombre": "Emanuel", "alias": ""}, {"nombre": "Nico", "alias": ""}], pd.DataFrame(columns=["Fecha", "Descripción", "Pagado por", "Monto", "Participantes"])
+    return [
+        {"nombre": "Pablo", "alias": "pabloyune"},
+        {"nombre": "Gerardo", "alias": ""},
+        {"nombre": "Emanuel", "alias": ""},
+        {"nombre": "Nico", "alias": ""}
+    ], pd.DataFrame(columns=["Fecha", "Descripción", "Pagado por", "Monto", "Participantes"])
 
 def guardar_datos(participantes, gastos):
     data = {
@@ -95,174 +105,11 @@ with pestanas[2]:
                     st.error("Debe quedar al menos un participante.")
 
     if st.button("Reiniciar lista por defecto"):
-        st.session_state.participantes = [{"nombre": "Pablo", "alias": ""}, {"nombre": "Gerardo", "alias": ""}, {"nombre": "Emanuel", "alias": ""}, {"nombre": "Nico", "alias": ""}]
+        st.session_state.participantes = [
+            {"nombre": "Pablo", "alias": "pabloyune"},
+            {"nombre": "Gerardo", "alias": ""},
+            {"nombre": "Emanuel", "alias": ""},
+            {"nombre": "Nico", "alias": ""}
+        ]
         guardar_datos(st.session_state.participantes, st.session_state.gastos)
-        st.rerun()
-
-# Pestaña de Registrar Gasto
-with pestanas[1]:
-    st.subheader("Registrar Nuevo Gasto")
-    if len(nombres_participantes) == 0:
-        st.warning("Por favor, agregue al menos un participante en la pestaña 'Participantes'.")
-    else:
-        with st.form("form_gasto"):
-            descripcion = st.text_input("Descripción del gasto")
-            monto = st.number_input("Monto total", min_value=0.0, format="%.2f")
-            pagador = st.selectbox("Pagado por", nombres_participantes)
-            dividir_entre = st.multiselect("Dividir entre", nombres_participantes, default=nombres_participantes)
-            fecha = st.date_input("Fecha", datetime.now())
-            
-            submit = st.form_submit_button("Guardar Gasto")
-            if submit:
-                if descripcion and monto > 0 and dividir_entre:
-                    nuevo_gasto = pd.DataFrame({
-                        "Fecha": [fecha.strftime("%Y-%m-%d")],
-                        "Descripción": [descripcion],
-                        "Pagado por": [pagador],
-                        "Monto": [monto],
-                        "Participantes": [", ".join(dividir_entre)]
-                    })
-                    st.session_state.gastos = pd.concat([st.session_state.gastos, nuevo_gasto], ignore_index=True)
-                    guardar_datos(st.session_state.participantes, st.session_state.gastos)
-                    st.success("Gasto registrado exitosamente.")
-                else:
-                    st.error("Por favor complete todos los campos y seleccione participantes.")
-
-# Pestaña de Resumen & WhatsApp
-with pestanas[0]:
-    st.subheader("Resumen de Cuentas")
-    if len(st.session_state.gastos) > 0:
-        st.write("**Detalle de Compras:**")
-        st.dataframe(st.session_state.gastos, use_container_width=True)
-        
-        total_general = st.session_state.gastos["Monto"].sum()
-        st.metric("Gasto Total Acumulado", f"${total_general:,.2f}")
-        
-        # Estructuras para cálculos de saldos
-        saldos = {p["nombre"]: 0.0 for p in st.session_state.participantes}
-        total_pagado_por_persona = {p["nombre"]: 0.0 for p in st.session_state.participantes}
-        total_consumido_por_persona = {p["nombre"]: 0.0 for p in st.session_state.participantes}
-        detalle_personal = {p["nombre"]: [] for p in st.session_state.participantes}
-        
-        for _, row in st.session_state.gastos.iterrows():
-            pagador = row["Pagado por"]
-            monto = row["Monto"]
-            desc = row["Descripción"]
-            beneficiarios = [p.strip() for p in row["Participantes"].split(",") if p.strip() in saldos]
-            
-            if pagador in total_pagado_por_persona:
-                total_pagado_por_persona[pagador] += monto
-
-            if beneficiarios:
-                cuota = monto / len(beneficiarios)
-                if pagador in saldos:
-                    saldos[pagador] += monto
-                    detalle_personal[pagador].append(f"Pagó '{desc}' por un total de ${monto:,.2f}")
-                
-                for b in beneficiarios:
-                    saldos[b] -= cuota
-                    total_consumido_por_persona[b] += cuota
-                    detalle_personal[b].append(f"Participó en '{desc}' (Su parte: ${cuota:,.2f})")
-
-        st.markdown("---")
-        st.write("**Estado de Cuentas por Persona:**")
-        
-        mapa_alias = {p["nombre"]: p["alias"] for p in st.session_state.participantes}
-        num_participantes_total = len(st.session_state.participantes)
-        costo_promedio_persona = total_general / num_participantes_total if num_participantes_total > 0 else 0
-
-        acreedores = [p_nom for p_nom, s in saldos.items() if s > 0.01]
-        
-        for p_nombre, saldo in saldos.items():
-            gasto_personal = total_pagado_por_persona.get(p_nombre, 0.0)
-            consumo_total = total_consumido_por_persona.get(p_nombre, 0.0)
-            alias_propio = mapa_alias.get(p_nombre, "")
-            
-            if saldo > 0.01:
-                st.write(f"- **{p_nombre}**: gastó ${gasto_personal:,.2f} y debe recibir **${saldo:,.2f}**")
-                
-                # Mensaje de WhatsApp individual para acreedores
-                msj_ind = f"Hola {p_nombre}, este es tu resumen de gastos.\n\n"
-                msj_ind += f"Tus consumos y gastos registrados:\n"
-                for item in detalle_personal[p_nombre]:
-                    msj_ind += f"• {item}\n"
-                msj_ind += f"\nDebes de gastos compartidos: ${consumo_total:,.2f}\n"
-                msj_ind += f"Menos los gastos que realizaste: ${gasto_personal:,.2f}\n"
-                msj_ind += f"Total a recibir: ${saldo:,.2f}\n"
-                if alias_propio:
-                    msj_ind += f"\nTu Alias para recibir transferencias: {alias_propio}"
-                
-                url_ind = f"https://api.whatsapp.com/send?text={urllib.parse.quote(msj_ind)}"
-                st.markdown(f'<a href="{url_ind}" target="_blank"><button style="background-color:#25D366; color:white; border:none; padding:6px 12px; border-radius:4px; font-size:13px; font-weight:bold; cursor:pointer; margin-bottom:10px;">Enviar WhatsApp a {p_nombre}</button></a>', unsafe_allow_html=True)
-
-            elif saldo < -0.01:
-                monto_deuda = abs(saldo)
-                if gasto_personal > 0:
-                    st.write(f"- **{p_nombre}**: gastó ${gasto_personal:,.2f} y debe **${monto_deuda:,.2f}**")
-                else:
-                    st.write(f"- **{p_nombre}**: debe **${monto_deuda:,.2f}**")
-                
-                # Mensaje de WhatsApp individual para deudores
-                msj_ind = f"Hola {p_nombre}, este es tu resumen de gastos.\n\n"
-                msj_ind += f"Tus consumos y gastos registrados:\n"
-                for item in detalle_personal[p_nombre]:
-                    msj_ind += f"• {item}\n"
-                msj_ind += f"\nDebes de gastos compartidos: ${consumo_total:,.2f}\n"
-                msj_ind += f"Menos los gastos que realizaste: ${gasto_personal:,.2f}\n"
-                msj_ind += f"Total a transferir: ${monto_deuda:,.2f}\n"
-                
-                if acreedores:
-                    msj_ind += f"\nAlias para transferir:\n"
-                    for acr in acreedores:
-                        alias_acr = mapa_alias.get(acr, "")
-                        alias_str = f" ({alias_acr})" if alias_acr else ""
-                        msj_ind += f"• Transferir a {acr}{alias_str}\n"
-                
-                url_ind = f"https://api.whatsapp.com/send?text={urllib.parse.quote(msj_ind)}"
-                st.markdown(f'<a href="{url_ind}" target="_blank"><button style="background-color:#25D366; color:white; border:none; padding:6px 12px; border-radius:4px; font-size:13px; font-weight:bold; cursor:pointer; margin-bottom:10px;">Enviar WhatsApp a {p_nombre}</button></a>', unsafe_allow_html=True)
-            else:
-                st.write(f"- **{p_nombre}**: al día ($0.00)")
-                
-        if st.button("Eliminar último gasto"):
-            st.session_state.gastos = st.session_state.gastos.iloc[:-1].reset_index(drop=True)
-            guardar_datos(st.session_state.participantes, st.session_state.gastos)
-            st.rerun()
-            
-        st.markdown("---")
-        st.subheader("Enviar Resumen al Grupo de WhatsApp")
-        
-        # Mensaje al grupo de WhatsApp formateado exactamente como querés
-        lineas = []
-        lineas.append("RESUMEN DE GASTOS")
-        lineas.append("")
-        lineas.append("COMPRAS:")
-        
-        for index, row in st.session_state.gastos.iterrows():
-            lineas.append(f"• {row['Descripción']} (${row['Monto']:,.2f} pagado por {row['Pagado por']})")
-            
-        lineas.append("")
-        lineas.append(f"TOTAL: ${total_general:,.2f}")
-        lineas.append(f"Compartido por persona: ${costo_promedio_persona:,.2f}")
-        lineas.append("")
-        lineas.append("SALDOS:")
-        
-        for p_nombre, saldo in saldos.items():
-            gasto_personal = total_pagado_por_persona.get(p_nombre, 0.0)
-            alias_str = f" (Alias: {mapa_alias.get(p_nombre, '')})" if mapa_alias.get(p_nombre, '') else ""
-            
-            if saldo > 0.01:
-                lineas.append(f"• {p_nombre}: gastó ${gasto_personal:,.2f} y debe recibir ${saldo:,.2f}{alias_str}")
-            elif saldo < -0.01:
-                if gasto_personal > 0:
-                    lineas.append(f"• {p_nombre}: gastó ${gasto_personal:,.2f} y debe ${abs(saldo):,.2f}")
-                else:
-                    lineas.append(f"• {p_nombre}: debe ${abs(saldo):,.2f}")
-            else:
-                lineas.append(f"• {p_nombre}: al día ($0.00)")
-            
-        mensaje_grupo = "\n".join(lineas)
-        
-        url_whatsapp_grupo = f"https://api.whatsapp.com/send?text={urllib.parse.quote(mensaje_grupo)}"
-        st.markdown(f'<a href="{url_whatsapp_grupo}" target="_blank"><button style="background-color:#25D366; color:white; border:none; padding:10px 20px; border-radius:5px; font-weight:bold; cursor:pointer; width:100%;">Enviar Resumen al Grupo</button></a>', unsafe_allow_html=True)
-    else:
-        st.info("Aún no hay gastos registrados.")
+        st
