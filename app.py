@@ -25,7 +25,7 @@ def cargar_datos():
         try:
             with open(DATA_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                participantes = data.get("participantes", ["Pablo", "Mel"])
+                participantes = data.get("participantes", ["Pablo", "Gerardo", "Emanuel", "Nico"])
                 if participantes and isinstance(participantes[0], str):
                     participantes = [{"nombre": p, "alias": ""} for p in participantes]
                 
@@ -36,7 +36,7 @@ def cargar_datos():
                 return participantes, gastos
         except:
             pass
-    return [{"nombre": "Pablo", "alias": ""}, {"nombre": "Mel", "alias": ""}], pd.DataFrame(columns=["Fecha", "Descripción", "Pagado por", "Monto", "Participantes"])
+    return [{"nombre": "Pablo", "alias": ""}, {"nombre": "Gerardo", "alias": ""}, {"nombre": "Emanuel", "alias": ""}, {"nombre": "Nico", "alias": ""}], pd.DataFrame(columns=["Fecha", "Descripción", "Pagado por", "Monto", "Participantes"])
 
 def guardar_datos(participantes, gastos):
     data = {
@@ -95,7 +95,7 @@ with pestanas[2]:
                     st.error("Debe quedar al menos un participante.")
 
     if st.button("Reiniciar lista por defecto"):
-        st.session_state.participantes = [{"nombre": "Pablo", "alias": ""}, {"nombre": "Mel", "alias": ""}]
+        st.session_state.participantes = [{"nombre": "Pablo", "alias": ""}, {"nombre": "Gerardo", "alias": ""}, {"nombre": "Emanuel", "alias": ""}, {"nombre": "Nico", "alias": ""}]
         guardar_datos(st.session_state.participantes, st.session_state.gastos)
         st.rerun()
 
@@ -106,10 +106,10 @@ with pestanas[1]:
         st.warning("Por favor, agregue al menos un participante en la pestaña 'Participantes'.")
     else:
         with st.form("form_gasto"):
-            descripcion = st.text_input("Descripción del gasto (ej: Comida, Bebida extra, etc.)")
+            descripcion = st.text_input("Descripción del gasto")
             monto = st.number_input("Monto total", min_value=0.0, format="%.2f")
             pagador = st.selectbox("Pagado por", nombres_participantes)
-            dividir_entre = st.multiselect("Dividir entre (puedes seleccionar solo algunos para gastos extra)", nombres_participantes, default=nombres_participantes)
+            dividir_entre = st.multiselect("Dividir entre", nombres_participantes, default=nombres_participantes)
             fecha = st.date_input("Fecha", datetime.now())
             
             submit = st.form_submit_button("Guardar Gasto")
@@ -138,7 +138,7 @@ with pestanas[0]:
         total_general = st.session_state.gastos["Monto"].sum()
         st.metric("Gasto Total Acumulado", f"${total_general:,.2f}")
         
-        # Estructuras para cálculos
+        # Estructuras para cálculos de saldos
         saldos = {p["nombre"]: 0.0 for p in st.session_state.participantes}
         total_pagado_por_persona = {p["nombre"]: 0.0 for p in st.session_state.participantes}
         total_consumido_por_persona = {p["nombre"]: 0.0 for p in st.session_state.participantes}
@@ -171,7 +171,6 @@ with pestanas[0]:
         num_participantes_total = len(st.session_state.participantes)
         costo_promedio_persona = total_general / num_participantes_total if num_participantes_total > 0 else 0
 
-        # Identificar a quién transferir (quien tiene el saldo a favor más grande o principal)
         acreedores = [p_nom for p_nom, s in saldos.items() if s > 0.01]
         
         for p_nombre, saldo in saldos.items():
@@ -182,13 +181,13 @@ with pestanas[0]:
             if saldo > 0.01:
                 st.write(f"- **{p_nombre}**: gastó ${gasto_personal:,.2f} y debe recibir **${saldo:,.2f}**")
                 
-                # Botón de WhatsApp individual para acreedores
+                # Mensaje de WhatsApp individual para acreedores
                 msj_ind = f"Hola {p_nombre}, este es tu resumen de gastos.\n\n"
                 msj_ind += f"Tus consumos y gastos registrados:\n"
                 for item in detalle_personal[p_nombre]:
                     msj_ind += f"• {item}\n"
-                msj_ind += f"\nTotal de consumos: ${consumo_total:,.2f}\n"
-                msj_ind += f"Menos lo que pagaste: ${gasto_personal:,.2f}\n"
+                msj_ind += f"\nDebes de gastos compartidos: ${consumo_total:,.2f}\n"
+                msj_ind += f"Menos los gastos que realizaste: ${gasto_personal:,.2f}\n"
                 msj_ind += f"Total a recibir: ${saldo:,.2f}\n"
                 if alias_propio:
                     msj_ind += f"\nTu Alias para recibir transferencias: {alias_propio}"
@@ -198,9 +197,12 @@ with pestanas[0]:
 
             elif saldo < -0.01:
                 monto_deuda = abs(saldo)
-                st.write(f"- **{p_nombre}**: debe **${monto_deuda:,.2f}**")
+                if gasto_personal > 0:
+                    st.write(f"- **{p_nombre}**: gastó ${gasto_personal:,.2f} y debe **${monto_deuda:,.2f}**")
+                else:
+                    st.write(f"- **{p_nombre}**: debe **${monto_deuda:,.2f}**")
                 
-                # Armado del detalle matemático solicitado
+                # Mensaje de WhatsApp individual para deudores
                 msj_ind = f"Hola {p_nombre}, este es tu resumen de gastos.\n\n"
                 msj_ind += f"Tus consumos y gastos registrados:\n"
                 for item in detalle_personal[p_nombre]:
@@ -209,7 +211,6 @@ with pestanas[0]:
                 msj_ind += f"Menos los gastos que realizaste: ${gasto_personal:,.2f}\n"
                 msj_ind += f"Total a transferir: ${monto_deuda:,.2f}\n"
                 
-                # Agregar los alias a los que debe transferir
                 if acreedores:
                     msj_ind += f"\nAlias para transferir:\n"
                     for acr in acreedores:
@@ -230,7 +231,7 @@ with pestanas[0]:
         st.markdown("---")
         st.subheader("Enviar Resumen al Grupo de WhatsApp")
         
-        # Mensaje al grupo de WhatsApp
+        # Mensaje al grupo de WhatsApp formateado exactamente como querés
         lineas = []
         lineas.append("RESUMEN DE GASTOS")
         lineas.append("")
@@ -247,11 +248,15 @@ with pestanas[0]:
         
         for p_nombre, saldo in saldos.items():
             gasto_personal = total_pagado_por_persona.get(p_nombre, 0.0)
+            alias_str = f" (Alias: {mapa_alias.get(p_nombre, '')})" if mapa_alias.get(p_nombre, '') else ""
+            
             if saldo > 0.01:
-                alias_str = f" - Alias: {mapa_alias.get(p_nombre, '')}" if mapa_alias.get(p_nombre, '') else ""
                 lineas.append(f"• {p_nombre}: gastó ${gasto_personal:,.2f} y debe recibir ${saldo:,.2f}{alias_str}")
             elif saldo < -0.01:
-                lineas.append(f"• {p_nombre}: debe ${abs(saldo):,.2f}")
+                if gasto_personal > 0:
+                    lineas.append(f"• {p_nombre}: gastó ${gasto_personal:,.2f} y debe ${abs(saldo):,.2f}")
+                else:
+                    lineas.append(f"• {p_nombre}: debe ${abs(saldo):,.2f}")
             else:
                 lineas.append(f"• {p_nombre}: al día ($0.00)")
             
