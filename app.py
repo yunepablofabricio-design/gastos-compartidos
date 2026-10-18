@@ -138,7 +138,7 @@ with pestanas[0]:
     st.subheader("Resumen de Cuentas")
     
     # Campo para modificar el Alias fácilmente desde la app
-    alias_input = st.text_input("Configurar Alias de cobro (ej: viaje.amigos.mp)", value=st.session_state.alias_general)
+    alias_input = st.text_input("Configurar Alias para transferencias (ej: viaje.amigos.mp)", value=st.session_state.alias_general)
     if alias_input != st.session_state.alias_general:
         st.session_state.alias_general = alias_input
         guardar_datos(st.session_state.participantes, st.session_state.gastos, st.session_state.alias_general)
@@ -193,24 +193,24 @@ with pestanas[0]:
         st.markdown("---")
         st.subheader("Enviar Resumen por WhatsApp")
         
-        # Construcción del mensaje con el formato de la imagen
+        # Construcción del mensaje final para el grupo
         lineas = []
-        lineas.append("💸 RESUMEN GENERAL DE GASTOS 💸")
+        lineas.append("RESUMEN GENERAL DE GASTOS")
         lineas.append("")
         
         for p_nombre, saldo in saldos.items():
             if saldo > 0.01:
-                lineas.append("• " + p_nombre + ": Recupera $" + f"{saldo:,.2f}")
+                lineas.append("- " + p_nombre + ": Recupera $" + f"{saldo:,.2f}")
             elif saldo < -0.01:
-                lineas.append("• " + p_nombre + ": Debe $" + f"{abs(saldo):,.2f}")
+                lineas.append("- " + p_nombre + ": Debe $" + f"{abs(saldo):,.2f}")
             else:
-                lineas.append("• " + p_nombre + ": Al día ($0.00)")
+                lineas.append("- " + p_nombre + ": Al día ($0.00)")
             
         lineas.append("")
         if st.session_state.alias_general:
-            lineas.append("📌 Alias MP: " + st.session_state.alias_general)
+            lineas.append("Alias MP: " + st.session_state.alias_general)
         else:
-            lineas.append("📌 Alias MP: [Sin configurar]")
+            lineas.append("Alias MP: [Sin configurar]")
             
         mensaje_grupo = "\n".join(lineas)
         
