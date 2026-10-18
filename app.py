@@ -190,10 +190,10 @@ with pestanas[0]:
                 msj_ind += "Tus movimientos:\n"
                 for item in detalle_personal[p_nombre]:
                     msj_ind += "- " + item + "\n"
-                msj_ind += "\nPara que te transfieran, tu alias es: " + (alias_actual if alias_actual else '[Indicar Alias]')
+                msj_ind += "\nPara que te transfieran, tu alias es: " + (alias_actual if alias_actual else 'No configurado')
                 
-                url_ind = "[https://api.whatsapp.com/send?text=](https://api.whatsapp.com/send?text=)" + urllib.parse.quote(msj_ind)
-                st.markdown('<a href="' + url_ind + '" target="_blank"><button style="background-color:#25D366; color:white; border:none; padding:6px 12px; border-radius:4px; font-size:13px; font-weight:bold; cursor:pointer; margin-bottom:10px;">Enviar WhatsApp a ' + p_nombre + '</button></a>', unsafe_allow_html=True)
+                text_enc = urllib.parse.quote(msj_ind)
+                st.link_button("Enviar WhatsApp a " + p_nombre, f"https://wa.me/?text={text_enc}")
 
             elif saldo < -0.01:
                 st.write("- **" + p_nombre + "**: debe pagar **$" + f"{abs(saldo):,.2f}" + "**")
@@ -207,11 +207,11 @@ with pestanas[0]:
                 msj_ind += "\nPuedes transferir a los siguientes alias:\n"
                 for otro_p, otro_saldo in saldos.items():
                     if otro_saldo > 0.01:
-                        a_ext = mapa_alias.get(otro_p, '[Sin alias]')
+                        a_ext = mapa_alias.get(otro_p, 'Sin alias')
                         msj_ind += "- " + otro_p + ": " + a_ext + "\n"
 
-                url_ind = "[https://api.whatsapp.com/send?text=](https://api.whatsapp.com/send?text=)" + urllib.parse.quote(msj_ind)
-                st.markdown('<a href="' + url_ind + '" target="_blank"><button style="background-color:#25D366; color:white; border:none; padding:6px 12px; border-radius:4px; font-size:13px; font-weight:bold; cursor:pointer; margin-bottom:10px;">Enviar WhatsApp a ' + p_nombre + '</button></a>', unsafe_allow_html=True)
+                text_enc = urllib.parse.quote(msj_ind)
+                st.link_button("Enviar WhatsApp a " + p_nombre, f"https://wa.me/?text={text_enc}")
             else:
                 st.write("- **" + p_nombre + "**: al día ($0.00)")
                 
@@ -249,7 +249,7 @@ with pestanas[0]:
         lineas.append("SALDOS Y ALIAS PARA TRANSFERIR:")
         for p_nombre, saldo in saldos.items():
             alias_val = mapa_alias.get(p_nombre, '')
-            alias_txt = " (Alias: " + alias_val + ")" if alias_val else " (Alias: [No configurado])"
+            alias_txt = " (Alias: " + alias_val + ")" if alias_val else " (Alias: No configurado)"
             if saldo > 0.01:
                 lineas.append("- " + p_nombre + ": recibe $" + f"{saldo:,.2f}" + alias_txt)
             elif saldo < -0.01:
@@ -258,8 +258,8 @@ with pestanas[0]:
                 lineas.append("- " + p_nombre + ": al día" + alias_txt)
             
         mensaje_grupo = "\n".join(lineas)
+        text_grupo_enc = urllib.parse.quote(mensaje_grupo)
         
-        url_whatsapp_grupo = "[https://api.whatsapp.com/send?text=](https://api.whatsapp.com/send?text=)" + urllib.parse.quote(mensaje_grupo)
-        st.markdown('<a href="' + url_whatsapp_grupo + '" target="_blank"><button style="background-color:#25D366; color:white; border:none; padding:10px 20px; border-radius:5px; font-weight:bold; cursor:pointer; width:100%;">Enviar Resumen Corto al Grupo</button></a>', unsafe_allow_html=True)
+        st.link_button("Enviar Resumen Corto al Grupo", f"https://wa.me/?text={text_grupo_enc}", type="primary")
     else:
         st.info("Aún no hay gastos registrados.")
