@@ -63,7 +63,7 @@ with pestanas[2]:
         nuevo_alias = st.text_input("Alias de transferencia (CBU / CVU / MP)")
         submit_p = st.form_submit_button("Agregar participante")
         if submit_p:
-            if nuevo_participante and nuevo_participante not in nombres_participantes:
+            if nuevo_participante and (nuevo_participante not in nombres_participantes):
                 st.session_state.participantes.append({"nombre": nuevo_participante, "alias": nuevo_alias})
                 guardar_datos(st.session_state.participantes, st.session_state.gastos)
                 st.success(f"Se agregó a {nuevo_participante}")
@@ -112,7 +112,64 @@ with pestanas[1]:
             
             submit = st.form_submit_button("Guardar Gasto")
             if submit:
-                if descripcion and monto > 0 and dividir_entre:
+                if descripcion and (monto > 0) and dividir_entre:
                     nuevo_gasto = pd.DataFrame({
                         "Fecha": [fecha.strftime("%Y-%m-%d")],
-                        "Descripción
+                        "Descripción": [descripcion],
+                        "Pagado por": [pagador],
+                        "Monto": [monto],
+                        "Participantes": [", ".join(dividir_entre)]
+                    })
+                    st.session_state.gastos = pd.concat([st.session_state.gastos, nuevo_gasto], ignore_index=True)
+                    guardar_datos(st.session_state.participantes, st.session_state.gastos)
+                    st.success("Gasto registrado exitosamente.")
+                else:
+                    st.error("Por favor complete todos los campos y seleccione participantes.")
+
+with pestanas[0]:
+    st.subheader("Resumen de Cuentas")
+    if len(st.session_state.gastos) > 0:
+        st.write("**Detalle de Compras:**")
+        st.dataframe(st.session_state.gastos, use_container_width=True)
+        
+        total_general = st.session_state.gastos["Monto"].sum()
+        st.metric("Gasto Total Acumulado", f"${total_general:,.2f}")
+        
+        saldos = {p["nombre"]: 0.0 for p in st.session_state.participantes}
+        gastos_totales_persona = {p["nombre"]: 0.0 for p in st.session_state.participantes}
+        detalle_personal = {p["nombre"]: [] for p in st.session_state.participantes}
+        
+        for _, row in st.session_state.gastos.iterrows():
+            pagador = row["Pagado por"]
+            monto = row["Monto"]
+            desc = row["Descripción"]
+            beneficiarios = [p.strip() for p in row["Participantes"].split(",") if p.strip() in saldos]
+            
+            if beneficiarios:
+                cuota = monto / len(beneficiarios)
+                if pagador in saldos:
+                    saldos[pagador] += monto
+                    gastos_totales_persona[pagador] += monto
+                    detalle_personal[pagador].append(f"Pagó '{desc}' por ${monto:,.2f}")
+                
+                for b in beneficiarios:
+                    saldos[b] -= cuota
+                    detalle_personal[b].append(f"Consumió en '{desc}' (${cuota:,.2f})")
+
+        cant_participantes = len(st.session_state.participantes)
+        compartido_por_persona = total_general / cant_participantes if cant_participantes > 0 else 0.0
+
+        st.markdown("---")
+        st.write("**Estado de Cuentas por Persona:**")
+        
+        mapa_alias = {p["nombre"]: p["alias"] for p in st.session_state.participantes}
+
+        for p_nombre, saldo in saldos.items():
+            gasto_p = gastos_totales_persona.get(p_nombre, 0.0)
+            alias_actual = mapa_alias.get(p_nombre, "")
+            
+            if saldo > 0.01:
+                st.write(f"- **{p_nombre}**: gastó ${gasto_p:,.2f} y debe recibir **${saldo:,.2f}**")
+                
+                msj_ind = f"Hola {p_nombre}, este es tu resumen individual de gastos.\n\n"
+                msj_ind += f"Tu saldo a favor a recibir es de
