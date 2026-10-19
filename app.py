@@ -27,10 +27,7 @@ def cargar_datos():
                 data = json.load(f)
                 participantes = data.get("participantes", ["Pablo", "Mel"])
                 if participantes and isinstance(participantes[0], str):
-                    participantes = [{"nombre": p.strip(), "alias": ""} for p in participantes if p.strip()]
-                else:
-                    # Normalizar nombres quitando espacios extra
-                    participantes = [{"nombre": p["nombre"].strip(), "alias": p.get("alias", "")} for p in participantes if p.get("nombre", "").strip()]
+                    participantes = [{"nombre": p, "alias": ""} for p in participantes]
                 
                 gastos_dict = data.get("gastos", [])
                 gastos = pd.DataFrame(gastos_dict)
@@ -64,7 +61,6 @@ pestanas = st.tabs(["📊 Resumen & WhatsApp", "💸 Registrar Gasto", "👥 Par
 
 nombres_participantes = [p["nombre"] for p in st.session_state.participantes]
 
-# Pestaña de Participantes
 with pestanas[2]:
     st.subheader("Configuración de Participantes y Alias")
     
@@ -73,13 +69,12 @@ with pestanas[2]:
         nuevo_alias = st.text_input("Alias de transferencia (CBU / CVU / MP)")
         submit_p = st.form_submit_button("Agregar participante")
         if submit_p:
-            nombre_limpio = nuevo_participante.strip()
-            if nombre_limpio and nombre_limpio not in nombres_participantes:
-                st.session_state.participantes.append({"nombre": nombre_limpio, "alias": nuevo_alias.strip()})
+            if nuevo_participante and nuevo_participante not in nombres_participantes:
+                st.session_state.participantes.append({"nombre": nuevo_participante, "alias": nuevo_alias})
                 guardar_datos(st.session_state.participantes, st.session_state.gastos)
-                st.success("Se agregó a " + nombre_limpio)
+                st.success("Se agregó a " + nuevo_participante)
                 st.rerun()
-            elif nombre_limpio in nombres_participantes:
+            elif nuevo_participante in nombres_participantes:
                 st.warning("Ese participante ya existe.")
 
     st.markdown("---")
@@ -92,7 +87,7 @@ with pestanas[2]:
         with col_b:
             nuevo_alias_val = st.text_input("Alias de " + p['nombre'], value=p['alias'], key="alias_tab_" + str(i))
             if nuevo_alias_val != p['alias']:
-                st.session_state.participantes[i]['alias'] = nuevo_alias_val.strip()
+                st.session_state.participantes[i]['alias'] = nuevo_alias_val
                 guardar_datos(st.session_state.participantes, st.session_state.gastos)
         with col_c:
             st.write("")
@@ -110,7 +105,6 @@ with pestanas[2]:
         guardar_datos(st.session_state.participantes, st.session_state.gastos)
         st.rerun()
 
-# Pestaña de Registrar Gasto
 with pestanas[1]:
     st.subheader("Registrar Nuevo Gasto")
     if len(nombres_participantes) == 0:
@@ -139,7 +133,6 @@ with pestanas[1]:
                 else:
                     st.error("Por favor complete todos los campos y seleccione participantes.")
 
-# Pestaña de Resumen & WhatsApp
 with pestanas[0]:
     st.subheader("Resumen de Cuentas")
     
@@ -237,7 +230,12 @@ with pestanas[0]:
             
         lineas.append("")
         lineas.append(f"TOTAL: ${total_general:,.2f}")
-        lineas.append(f"Compartido por persona: ${(total_general / len(nombres_participantes)):,.2f}")
+        
+        # Obtener los participantes que realmente tienen movimientos o saldos
+        participantes_activos = [p for p, s in saldos.items() if s != 0 or any(p in str(r['Participantes']) or p == str(r['Pagado por']) for _, r in st.session_state.gastos.iterrows())]
+        cant_personas = len(participantes_activos) if participantes_activos else len(saldos)
+        
+        lineas.append(f"Compartido por persona: ${(total_general / cant_personas):,.2f}")
         lineas.append("")
         
         lineas.append("SALDOS:")
@@ -255,7 +253,7 @@ with pestanas[0]:
                 else:
                     lineas.append(f"· {p_nombre}: debe ${abs(saldo):,.2f}")
             else:
-                lineas.append(f"· {p_nombre}: al día")
+                lineas.append(f"· {p_nombre} : al día")
 
         lineas.append("")
         lineas.append("ALIAS PARA TRANSFERIR:")
@@ -267,37 +265,6 @@ with pestanas[0]:
             
         mensaje_grupo = "\n".join(lineas)
         
-        url_whatsapp_grupo = "https://api.whatsapp.com/send?text=" + urllib.parse.quote(mensaje_grupo)
-        st.markdown('<a href="' + url_whatsapp_grupo + '" target="_blank"><button style="background-color:#25D366; color:white; border:none; padding:10px 20px; border-radius:5px; font-weight:bold; cursor:pointer; width:100%;">Enviar Resumen Corto al Grupo</button></a>', unsafe_allow_html=True)
-    else:
-        st.info("Aún no hay gastos registrados.")
-            
-            # Calcular cuánto gastó esta persona en total de su bolsillo
-            gasto_total_persona = float(st.session_state.gastos[st.session_state.gastos["Pagado por"] == p_nombre]["Monto"].sum())
-            
-            if saldo > 0.01:
-                lineas.append(f"· {p_nombre}: gastó ${gasto_total_persona:,.2f} y debe recibir ${saldo:,.2f}{alias_txt}")
-            elif saldo < -0.01:
-                if gasto_total_persona > 0:
-                    lineas.append(f"· {p_nombre}: gastó ${gasto_total_persona:,.2f} y debe ${abs(saldo):,.2f}")
-                else:
-                    lineas.append(f"· {p_nombre}: debe ${abs(saldo):,.2f}")
-            else:
-                lineas.append(f"· {p_nombre}: al día")
-
-        lineas.append("")
-        lineas.append("ALIAS PARA TRANSFERIR:")
-        for p_nombre, saldo in saldos.items():
-            if saldo > 0.01:
-                alias_val = mapa_alias.get(p_nombre, '')
-                if alias_val:
-                    lineas.append(f"· {p_nombre}: {alias_val}")
-        mensaje_grupo = "\n".join(lineas)
-        
-        url_whatsapp_grupo = "https://api.whatsapp.com/send?text=" + urllib.parse.quote(mensaje_grupo)
-        st.markdown('<a href="' + url_whatsapp_grupo + '" target="_blank"><button style="background-color:#25D366; color:white; border:none; padding:10px 20px; border-radius:5px; font-weight:bold; cursor:pointer; width:100%;">Enviar Resumen Corto al Grupo</button></a>', unsafe_allow_html=True)
-    else:
-        st.info("Aún no hay gastos registrados.")
         url_whatsapp_grupo = "https://api.whatsapp.com/send?text=" + urllib.parse.quote(mensaje_grupo)
         st.markdown('<a href="' + url_whatsapp_grupo + '" target="_blank"><button style="background-color:#25D366; color:white; border:none; padding:10px 20px; border-radius:5px; font-weight:bold; cursor:pointer; width:100%;">Enviar Resumen Corto al Grupo</button></a>', unsafe_allow_html=True)
     else:
