@@ -231,8 +231,6 @@ with pestanas[0]:
         lineas.append("")
         lineas.append(f"TOTAL: ${total_general:,.2f}")
         
-        # Divide directamente entre la cantidad total de participantes registrados
-       # Obtener las personas únicas que participan en las compras
         personas_en_gastos = set()
         for _, r in st.session_state.gastos.iterrows():
             part_list = [p.strip() for p in str(r['Participantes']).split(",") if p.strip()]
@@ -242,7 +240,7 @@ with pestanas[0]:
         lineas.append(f"Compartido por persona: ${(total_general / cant_personas):,.2f}")
         lineas.append("")
         
-      lineas.append("SALDOS:")
+        lineas.append("SALDOS:")
         for p_nombre, saldo in saldos.items():
             alias_val = mapa_alias.get(p_nombre, '')
             alias_txt = f" (Alias: {alias_val})" if alias_val else ""
@@ -256,9 +254,6 @@ with pestanas[0]:
                     lineas.append(f"· {p_nombre}: gastó ${gasto_total_persona:,.2f} y debe ${abs(saldo):,.2f}")
                 else:
                     lineas.append(f"· {p_nombre}: debe ${abs(saldo):,.2f}")
-            elif gasto_total_persona == 0 and abs(saldo) <= 0.01:
-                # Solo muestra "al día" si la persona no tiene movimientos de pago ni de deuda
-                pass
 
         lineas.append("")
         lineas.append("ALIAS PARA TRANSFERIR:")
