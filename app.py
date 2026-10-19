@@ -180,4 +180,90 @@ with pestanas[0]:
             alias_actual = mapa_alias.get(p_nombre, "")
             
             if saldo > 0.01:
-                st.write("- **" + p_nombre + "**: debe recibir **$" + f"{saldo:,.2f}" + "** (Alias: " + (alias_actual if alias
+                st.write("- **" + p_nombre + "**: debe recibir **$" + f"{saldo:,.2f}" + "** (Alias: " + (alias_actual if alias_actual else 'No configurado') + ")")
+                
+                msj_ind = "Hola " + p_nombre + ", este es tu resumen de gastos.\n\n"
+                msj_ind += "Tu saldo a favor es de: $" + f"{saldo:,.2f}" + "\n"
+                msj_ind += "Tus movimientos:\n"
+                for item in detalle_personal[p_nombre]:
+                    msj_ind += "- " + item + "\n"
+                msj_ind += "\nPara que te transfieran, tu alias es: " + (alias_actual if alias_actual else '[Indicar Alias]')
+                
+                url_ind = "https://api.whatsapp.com/send?text=" + urllib.parse.quote(msj_ind)
+                st.markdown('<a href="' + url_ind + '" target="_blank"><button style="background-color:#25D366; color:white; border:none; padding:6px 12px; border-radius:4px; font-size:13px; font-weight:bold; cursor:pointer; margin-bottom:10px;">Enviar WhatsApp a ' + p_nombre + '</button></a>', unsafe_allow_html=True)
+
+            elif saldo < -0.01:
+                st.write("- **" + p_nombre + "**: debe pagar **$" + f"{abs(saldo):,.2f}" + "**")
+                
+                msj_ind = "Hola " + p_nombre + ", este es tu resumen de gastos.\n\n"
+                msj_ind += "Debes abonar la suma de: $" + f"{abs(saldo):,.2f}" + "\n\n"
+                msj_ind += "Tus consumos y gastos registrados:\n"
+                for item in detalle_personal[p_nombre]:
+                    msj_ind += "- " + item + "\n"
+                
+                msj_ind += "\nPuedes transferir a los siguientes alias:\n"
+                for otro_p, otro_saldo in saldos.items():
+                    if otro_saldo > 0.01:
+                        a_ext = mapa_alias.get(otro_p, '[Sin alias]')
+                        msj_ind += f"- {otro_p}: {a_ext}\n"
+
+                url_ind = "https://api.whatsapp.com/send?text=" + urllib.parse.quote(msj_ind)
+                st.markdown('<a href="' + url_ind + '" target="_blank"><button style="background-color:#25D366; color:white; border:none; padding:6px 12px; border-radius:4px; font-size:13px; font-weight:bold; cursor:pointer; margin-bottom:10px;">Enviar WhatsApp a ' + p_nombre + '</button></a>', unsafe_allow_html=True)
+            else:
+                st.write("- **" + p_nombre + "**: al día ($0.00)")
+                
+        if st.button("Eliminar último gasto"):
+            st.session_state.gastos = st.session_state.gastos.iloc[:-1].reset_index(drop=True)
+            guardar_datos(st.session_state.participantes, st.session_state.gastos)
+            st.rerun()
+            
+        st.markdown("---")
+        st.subheader("Enviar Resumen Corto al Grupo de WhatsApp")
+        
+        lineas = []
+        lineas.append("RESUMEN DE GASTOS")
+        lineas.append("")
+        lineas.append("COMPRAS:")
+        
+        for index, row in st.session_state.gastos.iterrows():
+            lineas.append("· " + str(row['Descripción']) + " ($" + f"{float(row['Monto']):,.2f}" + " pagado por " + str(row['Pagado por']) + ")")
+            
+        lineas.append("")
+        lineas.append(f"TOTAL: ${total_general:,.2f}")
+        
+        # Divide directamente entre la cantidad total de participantes registrados
+        cant_personas = len(st.session_state.participantes)
+        lineas.append(f"Compartido por persona: ${(total_general / cant_personas):,.2f}")
+        lineas.append("")
+        
+        lineas.append("SALDOS:")
+        for p_nombre, saldo in saldos.items():
+            alias_val = mapa_alias.get(p_nombre, '')
+            alias_txt = f" (Alias: {alias_val})" if alias_val else ""
+            
+            gasto_total_persona = float(st.session_state.gastos[st.session_state.gastos["Pagado por"] == p_nombre]["Monto"].sum())
+            
+            if saldo > 0.01:
+                lineas.append(f"· {p_nombre}: gastó ${gasto_total_persona:,.2f} y debe recibir ${saldo:,.2f}{alias_txt}")
+            elif saldo < -0.01:
+                if gasto_total_persona > 0:
+                    lineas.append(f"· {p_nombre}: gastó ${gasto_total_persona:,.2f} y debe ${abs(saldo):,.2f}")
+                else:
+                    lineas.append(f"· {p_nombre}: debe ${abs(saldo):,.2f}")
+            else:
+                lineas.append(f"· {p_nombre} : al día")
+
+        lineas.append("")
+        lineas.append("ALIAS PARA TRANSFERIR:")
+        for p_nombre, saldo in saldos.items():
+            if saldo > 0.01:
+                alias_val = mapa_alias.get(p_nombre, '')
+                if alias_val:
+                    lineas.append(f"· {p_nombre}: {alias_val}")
+            
+        mensaje_grupo = "\n".join(lineas)
+        
+        url_whatsapp_grupo = "https://api.whatsapp.com/send?text=" + urllib.parse.quote(mensaje_grupo)
+        st.markdown('<a href="' + url_whatsapp_grupo + '" target="_blank"><button style="background-color:#25D366; color:white; border:none; padding:10px 20px; border-radius:5px; font-weight:bold; cursor:pointer; width:100%;">Enviar Resumen Corto al Grupo</button></a>', unsafe_allow_html=True)
+    else:
+        st.info("Aún no hay gastos registrados.")
