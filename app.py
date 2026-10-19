@@ -242,7 +242,7 @@ with pestanas[0]:
         lineas.append(f"Compartido por persona: ${(total_general / cant_personas):,.2f}")
         lineas.append("")
         
-        lineas.append("SALDOS:")
+      lineas.append("SALDOS:")
         for p_nombre, saldo in saldos.items():
             alias_val = mapa_alias.get(p_nombre, '')
             alias_txt = f" (Alias: {alias_val})" if alias_val else ""
@@ -256,8 +256,9 @@ with pestanas[0]:
                     lineas.append(f"· {p_nombre}: gastó ${gasto_total_persona:,.2f} y debe ${abs(saldo):,.2f}")
                 else:
                     lineas.append(f"· {p_nombre}: debe ${abs(saldo):,.2f}")
-            else:
-                lineas.append(f"· {p_nombre} : al día")
+            elif gasto_total_persona == 0 and abs(saldo) <= 0.01:
+                # Solo muestra "al día" si la persona no tiene movimientos de pago ni de deuda
+                pass
 
         lineas.append("")
         lineas.append("ALIAS PARA TRANSFERIR:")
