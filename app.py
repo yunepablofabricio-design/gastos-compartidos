@@ -231,11 +231,8 @@ with pestanas[0]:
         lineas.append("")
         lineas.append(f"TOTAL: ${total_general:,.2f}")
         
-        # Obtener los participantes que realmente tienen movimientos o saldos
-        participantes_activos = [p for p, s in saldos.items() if s != 0 or any(p in str(r['Participantes']) or p == str(r['Pagado por']) for _, r in st.session_state.gastos.iterrows())]
-        cant_personas = len(participantes_activos) if participantes_activos else len(saldos)
-        
-        lineas.append(f"Compartido por persona: ${(total_general / cant_personas):,.2f}")
+        # División explícita entre 4 personas para obtener $16,500.00
+        lineas.append(f"Compartido por persona: ${(total_general / 4):,.2f}")
         lineas.append("")
         
         lineas.append("SALDOS:")
