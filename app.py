@@ -253,35 +253,35 @@ with pestanas[0]:
             lineas.append("SALDOS:")
         for p_nombre, saldo in saldos.items():
             alias_val = mapa_alias.get(p_nombre, '')
-            alias_txt = f" (Alias: {alias_val})" if alias_val else ""
+            alias_txt = " (Alias: " + alias_val + ")" if alias_val else ""
             
-            # Calcular cuánto gastó en total esta persona de su bolsillo
-            gasto_total_persona = st.session_state.gastos[st.session_state.gastos["Pagado por"] == p_nombre]["Monto"].sum()
+            # Calcular cuánto gastó esta persona en total
+            gasto_total_persona = float(st.session_state.gastos[st.session_state.gastos["Pagado por"] == p_nombre]["Monto"].sum())
             
             if saldo > 0.01:
-                lineas.append(f"- {p_nombre}: gastó ${gasto_total_persona:,.2f} y debe recibir ${saldo:,.2f}{alias_txt}")
+                lineas.append("- " + p_nombre + ": gastó $" + f"{gasto_total_persona:,.2f}" + " y debe recibir $" + f"{saldo:,.2f}" + alias_txt)
             elif saldo < -0.01:
-                # Si no pagó nada pero debe, o si pagó menos de lo que consumió
                 if gasto_total_persona > 0:
-                    lineas.append(f"- {p_nombre}: gastó ${gasto_total_persona:,.2f} y debe ${abs(saldo):,.2f}")
+                    lineas.append("- " + p_nombre + ": gastó $" + f"{gasto_total_persona:,.2f}" + " y debe $" + f"{abs(saldo):,.2f}")
                 else:
-                    lineas.append(f"- {p_nombre}: debe ${abs(saldo):,.2f}")
+                    lineas.append("- " + p_nombre + ": debe $" + f"{abs(saldo):,.2f}")
             else:
-                lineas.append(f"- {p_nombre}: al día")
+                lineas.append("- " + p_nombre + ": al día")
 
-        lineas.append("SALDOS Y ALIAS PARA TRANSFERIR:")
+        lineas.append("")
+        lineas.append("ALIAS PARA TRANSFERIR:")
         for p_nombre, saldo in saldos.items():
-            alias_val = mapa_alias.get(p_nombre, '')
-            alias_txt = f" (Alias: {alias_val})" if alias_val else " (Alias: [No configurado])"
             if saldo > 0.01:
-                lineas.append("- " + p_nombre + ": recibe $" + f"{saldo:,.2f}" + alias_txt)
-            elif saldo < -0.01:
-                lineas.append("- " + p_nombre + ": debe $" + f"{abs(saldo):,.2f}")
-            else:
-                lineas.append("- " + p_nombre + ": al día" + alias_txt)
-            
+                alias_val = mapa_alias.get(p_nombre, '')
+                if alias_val:
+                    lineas.append("- " + p_nombre + ": " + alias_val)
+
         mensaje_grupo = "\n".join(lineas)
         
+        url_whatsapp_grupo = "https://api.whatsapp.com/send?text=" + urllib.parse.quote(mensaje_grupo)
+        st.markdown('<a href="' + url_whatsapp_grupo + '" target="_blank"><button style="background-color:#25D366; color:white; border:none; padding:10px 20px; border-radius:5px; font-weight:bold; cursor:pointer; width:100%;">Enviar Resumen Corto al Grupo</button></a>', unsafe_allow_html=True)
+    else:
+        st.info("Aún no hay gastos registrados.")
         url_whatsapp_grupo = "https://api.whatsapp.com/send?text=" + urllib.parse.quote(mensaje_grupo)
         st.markdown('<a href="' + url_whatsapp_grupo + '" target="_blank"><button style="background-color:#25D366; color:white; border:none; padding:10px 20px; border-radius:5px; font-weight:bold; cursor:pointer; width:100%;">Enviar Resumen Corto al Grupo</button></a>', unsafe_allow_html=True)
     else:
