@@ -238,6 +238,7 @@ with pestanas[0]:
             lineas.append("")
             
         lineas.append("TOTAL: $" + f"{total_general:,.2f}")
+        lineas.append("Compartido por persona: $" + f"{(total_general / len(saldos)):,.2f}")
         lineas.append("")
         lineas.append("DETALLE POR PERSONA:")
         lineas.append("")
