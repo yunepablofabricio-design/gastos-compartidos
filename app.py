@@ -232,7 +232,13 @@ with pestanas[0]:
         lineas.append(f"TOTAL: ${total_general:,.2f}")
         
         # Divide directamente entre la cantidad total de participantes registrados
-        cant_personas = len(st.session_state.participantes)
+       # Obtener las personas únicas que participan en las compras
+        personas_en_gastos = set()
+        for _, r in st.session_state.gastos.iterrows():
+            part_list = [p.strip() for p in str(r['Participantes']).split(",") if p.strip()]
+            personas_en_gastos.update(part_list)
+        
+        cant_personas = len(personas_en_gastos) if personas_en_gastos else len(st.session_state.participantes)
         lineas.append(f"Compartido por persona: ${(total_general / cant_personas):,.2f}")
         lineas.append("")
         
