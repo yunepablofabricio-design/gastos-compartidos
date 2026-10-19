@@ -250,23 +250,23 @@ with pestanas[0]:
             else:
                 lineas.append("  - Sin movimientos")
             lineas.append("")
-           lineas.append("SALDOS:")
+          lineas.append("SALDOS:")
         for p_nombre, saldo in saldos.items():
             alias_val = mapa_alias.get(p_nombre, '')
             alias_txt = f" (Alias: {alias_val})" if alias_val else ""
             
-            # Calcular cuánto gastó esta persona en total
+            # Calcular cuánto gastó esta persona en total de su bolsillo
             gasto_total_persona = float(st.session_state.gastos[st.session_state.gastos["Pagado por"] == p_nombre]["Monto"].sum())
             
             if saldo > 0.01:
-                lineas.append(f"  · {p_nombre}: gastó ${gasto_total_persona:,.2f} y debe recibir ${saldo:,.2f}{alias_txt}")
+                lineas.append(f"· {p_nombre}: gastó ${gasto_total_persona:,.2f} y debe recibir ${saldo:,.2f}{alias_txt}")
             elif saldo < -0.01:
                 if gasto_total_persona > 0:
-                    lineas.append(f"  · {p_nombre}: gastó ${gasto_total_persona:,.2f} y debe ${abs(saldo):,.2f}")
+                    lineas.append(f"· {p_nombre}: gastó ${gasto_total_persona:,.2f} y debe ${abs(saldo):,.2f}")
                 else:
-                    lineas.append(f"  · {p_nombre}: debe ${abs(saldo):,.2f}")
+                    lineas.append(f"· {p_nombre}: debe ${abs(saldo):,.2f}")
             else:
-                lineas.append(f"  · {p_nombre}: al día")
+                lineas.append(f"· {p_nombre}: al día")
 
         lineas.append("")
         lineas.append("ALIAS PARA TRANSFERIR:")
@@ -274,7 +274,7 @@ with pestanas[0]:
             if saldo > 0.01:
                 alias_val = mapa_alias.get(p_nombre, '')
                 if alias_val:
-                    lineas.append(f"  · {p_nombre}: {alias_val}")
+                    lineas.append(f"· {p_nombre}: {alias_val}")
         mensaje_grupo = "\n".join(lineas)
         
         url_whatsapp_grupo = "https://api.whatsapp.com/send?text=" + urllib.parse.quote(mensaje_grupo)
