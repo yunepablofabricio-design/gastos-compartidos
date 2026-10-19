@@ -250,6 +250,24 @@ with pestanas[0]:
             else:
                 lineas.append("  - Sin movimientos")
             lineas.append("")
+            lineas.append("SALDOS:")
+        for p_nombre, saldo in saldos.items():
+            alias_val = mapa_alias.get(p_nombre, '')
+            alias_txt = f" (Alias: {alias_val})" if alias_val else ""
+            
+            # Calcular cuánto gastó en total esta persona de su bolsillo
+            gasto_total_persona = st.session_state.gastos[st.session_state.gastos["Pagado por"] == p_nombre]["Monto"].sum()
+            
+            if saldo > 0.01:
+                lineas.append(f"- {p_nombre}: gastó ${gasto_total_persona:,.2f} y debe recibir ${saldo:,.2f}{alias_txt}")
+            elif saldo < -0.01:
+                # Si no pagó nada pero debe, o si pagó menos de lo que consumió
+                if gasto_total_persona > 0:
+                    lineas.append(f"- {p_nombre}: gastó ${gasto_total_persona:,.2f} y debe ${abs(saldo):,.2f}")
+                else:
+                    lineas.append(f"- {p_nombre}: debe ${abs(saldo):,.2f}")
+            else:
+                lineas.append(f"- {p_nombre}: al día")
 
         lineas.append("SALDOS Y ALIAS PARA TRANSFERIR:")
         for p_nombre, saldo in saldos.items():
