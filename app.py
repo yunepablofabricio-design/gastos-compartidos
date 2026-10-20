@@ -179,15 +179,18 @@ with pestanas[0]:
         for p_nombre, saldo in saldos.items():
             alias_actual = mapa_alias.get(p_nombre, "")
             
-            if saldo > 0.01:
+           if saldo > 0.01:
                 st.write("- **" + p_nombre + "**: debe recibir **$" + f"{saldo:,.2f}" + "** (Alias: " + (alias_actual if alias_actual else 'No configurado') + ")")
                 
-                msj_ind = "Hola " + p_nombre + ", este es tu resumen de gastos.\n\n"
-                msj_ind += "Tu saldo a favor es de: $" + f"{saldo:,.2f}" + "\n"
-                msj_ind += "Tus movimientos:\n"
-                for item in detalle_personal[p_nombre]:
-                    msj_ind += "- " + item + "\n"
-                msj_ind += "\nPara que te transfieran, tu alias es: " + (alias_actual if alias_actual else '[Indicar Alias]')
+                # Calcular consumo total y pagado de esta persona
+                gasto_total_persona = float(st.session_state.gastos[st.session_state.gastos["Pagado por"] == p_nombre]["Monto"].sum())
+                consumo_total_persona = gasto_total_persona - saldo
+                
+                msj_ind = f"Hola {p_nombre}, este es tu resumen de gastos.\n\n"
+                msj_ind += f"· Consumo total individual: ${consumo_total_persona:,.2f}\n"
+                msj_ind += f"· Compras abonadas: ${gasto_total_persona:,.2f}\n"
+                msj_ind += f"· Debe recibir: ${saldo:,.2f}\n\n"
+                msj_ind += "Para que te transfieran, tu alias es: " + (alias_actual if alias_actual else '[Indicar Alias]')
                 
                 url_ind = "https://api.whatsapp.com/send?text=" + urllib.parse.quote(msj_ind)
                 st.markdown('<a href="' + url_ind + '" target="_blank"><button style="background-color:#25D366; color:white; border:none; padding:6px 12px; border-radius:4px; font-size:13px; font-weight:bold; cursor:pointer; margin-bottom:10px;">Enviar WhatsApp a ' + p_nombre + '</button></a>', unsafe_allow_html=True)
@@ -195,17 +198,21 @@ with pestanas[0]:
             elif saldo < -0.01:
                 st.write("- **" + p_nombre + "**: debe pagar **$" + f"{abs(saldo):,.2f}" + "**")
                 
-                msj_ind = "Hola " + p_nombre + ", este es tu resumen de gastos.\n\n"
-                msj_ind += "Debes abonar la suma de: $" + f"{abs(saldo):,.2f}" + "\n\n"
-                msj_ind += "Tus consumos y gastos registrados:\n"
-                for item in detalle_personal[p_nombre]:
-                    msj_ind += "- " + item + "\n"
+                # Calcular consumo total y pagado de esta persona
+                gasto_total_persona = float(st.session_state.gastos[st.session_state.gastos["Pagado por"] == p_nombre]["Monto"].sum())
+                consumo_total_persona = gasto_total_persona + abs(saldo)
                 
-                msj_ind += "\nPuedes transferir a los siguientes alias:\n"
+                msj_ind = f"Hola {p_nombre}, este es tu resumen de gastos.\n\n"
+                msj_ind += f"· Consumo total individual: ${consumo_total_persona:,.2f}\n"
+                if gasto_total_persona > 0:
+                    msj_ind += f"· Compras abonadas: ${gasto_total_persona:,.2f}\n"
+                msj_ind += f"· Debe abonar la suma de: ${abs(saldo):,.2f}\n\n"
+                
+                msj_ind += "Puedes transferir a los siguientes alias:\n"
                 for otro_p, otro_saldo in saldos.items():
                     if otro_saldo > 0.01:
                         a_ext = mapa_alias.get(otro_p, '[Sin alias]')
-                        msj_ind += f"- {otro_p}: {a_ext}\n"
+                        msj_ind += f"· {otro_p}: {a_ext}\n"
 
                 url_ind = "https://api.whatsapp.com/send?text=" + urllib.parse.quote(msj_ind)
                 st.markdown('<a href="' + url_ind + '" target="_blank"><button style="background-color:#25D366; color:white; border:none; padding:6px 12px; border-radius:4px; font-size:13px; font-weight:bold; cursor:pointer; margin-bottom:10px;">Enviar WhatsApp a ' + p_nombre + '</button></a>', unsafe_allow_html=True)
