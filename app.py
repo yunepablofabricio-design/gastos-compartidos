@@ -230,19 +230,33 @@ with pestanas[0]:
         lineas.append("")
         lineas.append("COMPRAS:")
         
+        total_compartidos = 0.0
+        total_extras = 0.0
+        
         for index, row in st.session_state.gastos.iterrows():
-            lineas.append("· " + str(row['Descripción']) + " ($" + f"{float(row['Monto']):,.2f}" + " pagado por " + str(row['Pagado por']) + ")")
+            monto_row = float(row['Monto'])
+            part_raw = [p.strip() for p in str(row['Participantes']).split(",") if p.strip()]
+            
+            # Si incluye a todos los participantes registrados, es un gasto compartido general
+            if len(part_raw) == len(st.session_state.participantes):
+                etiqueta_part = "(Todos)"
+                total_compartidos += monto_row
+            else:
+                etiqueta_part = f"({'/'.join(part_raw)})"
+                total_extras += monto_row
+                
+            lineas.append(f"· {row['Descripción']} (${monto_row:,.2f} pagado por {row['Pagado por']}) {etiqueta_part}")
             
         lineas.append("")
-        lineas.append(f"TOTAL: ${total_general:,.2f}")
+        lineas.append(f"TOTAL DE GASTOS COMPARTIDOS: ${total_compartidos:,.2f}")
         
-        personas_en_gastos = set()
-        for _, r in st.session_state.gastos.iterrows():
-            part_list = [p.strip() for p in str(r['Participantes']).split(",") if p.strip()]
-            personas_en_gastos.update(part_list)
+        # Se calcula el compartido por persona solo sobre los gastos que son para (Todos)
+        cant_personas = len(st.session_state.participantes)
+        lineas.append(f"Compartido por persona: ${(total_compartidos / cant_personas):,.2f}")
         
-        cant_personas = len(personas_en_gastos) if personas_en_gastos else len(st.session_state.participantes)
-        lineas.append(f"Compartido por persona: ${(total_general / cant_personas):,.2f}")
+        if total_extras > 0:
+            lineas.append(f"TOTAL DE GASTOS EXTRAS: ${total_extras:,.2f}")
+            
         lineas.append("")
         
         lineas.append("SALDOS:")
