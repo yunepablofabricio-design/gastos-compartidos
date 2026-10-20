@@ -148,28 +148,29 @@ with pestanas[0]:
         st.dataframe(st.session_state.gastos, use_container_width=True)
         
         st.session_state.gastos["Monto"] = pd.to_numeric(st.session_state.gastos["Monto"], errors="coerce").fillna(0.0)
-        total_general = st.session_state.gastos["Monto"].sum()
+        total_general = float(st.session_state.gastos["Monto"].sum())
         st.metric("Gasto Total Acumulado", "$" + f"{total_general:,.2f}")
         
+        # Calcular saldos y total pagado por cada persona
         saldos = {p["nombre"]: 0.0 for p in st.session_state.participantes}
-        detalle_personal = {p["nombre"]: [] for p in st.session_state.participantes}
+        pagos_por_persona = {p["nombre"]: 0.0 for p in st.session_state.participantes}
+        consumos_por_persona = {p["nombre"]: 0.0 for p in st.session_state.participantes}
         
         for _, row in st.session_state.gastos.iterrows():
-            pagador = str(row["Pagado por"])
+            pagador = str(row["Pagado por"]).strip()
             monto = float(row["Monto"])
-            desc = str(row["Descripción"])
             part_str = str(row["Participantes"])
             beneficiarios = [p.strip() for p in part_str.split(",") if p.strip() in saldos]
             
+            if pagador in pagos_por_persona:
+                pagos_por_persona[pagador] += monto
+                saldos[pagador] += monto
+                
             if beneficiarios:
                 cuota = monto / len(beneficiarios)
-                if pagador in saldos:
-                    saldos[pagador] += monto
-                    detalle_personal[pagador].append("Pagó '" + desc + "' por $" + f"{monto:,.2f}")
-                
                 for b in beneficiarios:
+                    consumos_por_persona[b] += cuota
                     saldos[b] -= cuota
-                    detalle_personal[b].append("Consumió en '" + desc + "' ($" + f"{cuota:,.2f}" + ")")
 
         st.markdown("---")
         st.write("**Estado de Cuentas por Persona:**")
@@ -178,12 +179,11 @@ with pestanas[0]:
 
         for p_nombre, saldo in saldos.items():
             alias_actual = mapa_alias.get(p_nombre, "")
+            gasto_total_persona = pagos_por_persona.get(p_nombre, 0.0)
+            consumo_total_persona = consumos_por_persona.get(p_nombre, 0.0)
             
             if saldo > 0.01:
                 st.write("- **" + p_nombre + "**: debe recibir **$" + f"{saldo:,.2f}" + "** (Alias: " + (alias_actual if alias_actual else 'No configurado') + ")")
-                
-                gasto_total_persona = float(st.session_state.gastos[st.session_state.gastos["Pagado por"] == p_nombre]["Monto"].sum())
-                consumo_total_persona = gasto_total_persona - saldo
                 
                 msj_ind = f"Hola {p_nombre}, este es tu resumen de gastos.\n\n"
                 msj_ind += f"· Consumo total individual: ${consumo_total_persona:,.2f}\n"
@@ -196,9 +196,6 @@ with pestanas[0]:
 
             elif saldo < -0.01:
                 st.write("- **" + p_nombre + "**: debe pagar **$" + f"{abs(saldo):,.2f}" + "**")
-                
-                gasto_total_persona = float(st.session_state.gastos[st.session_state.gastos["Pagado por"] == p_nombre]["Monto"].sum())
-                consumo_total_persona = gasto_total_persona + abs(saldo)
                 
                 msj_ind = f"Hola {p_nombre}, este es tu resumen de gastos.\n\n"
                 msj_ind += f"· Consumo total individual: ${consumo_total_persona:,.2f}\n"
@@ -225,7 +222,7 @@ with pestanas[0]:
         st.markdown("---")
         st.subheader("Enviar Resumen Corto al Grupo de WhatsApp")
         
-        # 1. Identificar las personas que forman parte de los gastos del grupo
+        # Identificar los participantes activos
         personas_en_gastos = set()
         for _, r in st.session_state.gastos.iterrows():
             part_list = [p.strip() for p in str(r['Participantes']).split(",") if p.strip()]
@@ -245,7 +242,6 @@ with pestanas[0]:
             monto_row = float(row['Monto'])
             part_raw = [p.strip() for p in str(row['Participantes']).split(",") if p.strip()]
             
-            # Es (Todos) si la lista de beneficiarios coincide con todas las personas activas en los gastos
             if set(part_raw) == personas_en_gastos:
                 etiqueta_part = "(Todos)"
                 total_compartidos += monto_row
@@ -272,7 +268,7 @@ with pestanas[0]:
                 alias_val = mapa_alias.get(p_nombre, '')
                 alias_txt = f" (Alias: {alias_val})" if alias_val else ""
                 
-                gasto_total_persona = float(st.session_state.gastos[st.session_state.gastos["Pagado por"] == p_nombre]["Monto"].sum())
+                gasto_total_persona = pagos_por_persona.get(p_nombre, 0.0)
                 
                 if saldo > 0.01:
                     lineas.append(f"· {p_nombre}: gastó ${gasto_total_persona:,.2f} y debe recibir ${saldo:,.2f}{alias_txt}")
