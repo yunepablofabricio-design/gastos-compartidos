@@ -225,6 +225,14 @@ with pestanas[0]:
         st.markdown("---")
         st.subheader("Enviar Resumen Corto al Grupo de WhatsApp")
         
+        # 1. Identificar las personas que forman parte de los gastos del grupo
+        personas_en_gastos = set()
+        for _, r in st.session_state.gastos.iterrows():
+            part_list = [p.strip() for p in str(r['Participantes']).split(",") if p.strip()]
+            personas_en_gastos.update(part_list)
+            if str(r['Pagado por']).strip():
+                personas_en_gastos.add(str(r['Pagado por']).strip())
+        
         lineas = []
         lineas.append("RESUMEN DE GASTOS")
         lineas.append("")
@@ -237,8 +245,8 @@ with pestanas[0]:
             monto_row = float(row['Monto'])
             part_raw = [p.strip() for p in str(row['Participantes']).split(",") if p.strip()]
             
-            # Si incluye a todos los participantes registrados, es un gasto compartido general
-            if len(part_raw) == len(st.session_state.participantes):
+            # Es (Todos) si la lista de beneficiarios coincide con todas las personas activas en los gastos
+            if set(part_raw) == personas_en_gastos:
                 etiqueta_part = "(Todos)"
                 total_compartidos += monto_row
             else:
@@ -250,8 +258,7 @@ with pestanas[0]:
         lineas.append("")
         lineas.append(f"TOTAL DE GASTOS COMPARTIDOS: ${total_compartidos:,.2f}")
         
-        # Se calcula el compartido por persona solo sobre los gastos que son para (Todos)
-        cant_personas = len(st.session_state.participantes)
+        cant_personas = len(personas_en_gastos) if personas_en_gastos else len(st.session_state.participantes)
         lineas.append(f"Compartido por persona: ${(total_compartidos / cant_personas):,.2f}")
         
         if total_extras > 0:
@@ -261,23 +268,24 @@ with pestanas[0]:
         
         lineas.append("SALDOS:")
         for p_nombre, saldo in saldos.items():
-            alias_val = mapa_alias.get(p_nombre, '')
-            alias_txt = f" (Alias: {alias_val})" if alias_val else ""
-            
-            gasto_total_persona = float(st.session_state.gastos[st.session_state.gastos["Pagado por"] == p_nombre]["Monto"].sum())
-            
-            if saldo > 0.01:
-                lineas.append(f"· {p_nombre}: gastó ${gasto_total_persona:,.2f} y debe recibir ${saldo:,.2f}{alias_txt}")
-            elif saldo < -0.01:
-                if gasto_total_persona > 0:
-                    lineas.append(f"· {p_nombre}: gastó ${gasto_total_persona:,.2f} y debe ${abs(saldo):,.2f}")
-                else:
-                    lineas.append(f"· {p_nombre}: debe ${abs(saldo):,.2f}")
+            if p_nombre in personas_en_gastos:
+                alias_val = mapa_alias.get(p_nombre, '')
+                alias_txt = f" (Alias: {alias_val})" if alias_val else ""
+                
+                gasto_total_persona = float(st.session_state.gastos[st.session_state.gastos["Pagado por"] == p_nombre]["Monto"].sum())
+                
+                if saldo > 0.01:
+                    lineas.append(f"· {p_nombre}: gastó ${gasto_total_persona:,.2f} y debe recibir ${saldo:,.2f}{alias_txt}")
+                elif saldo < -0.01:
+                    if gasto_total_persona > 0:
+                        lineas.append(f"· {p_nombre}: gastó ${gasto_total_persona:,.2f} y debe ${abs(saldo):,.2f}")
+                    else:
+                        lineas.append(f"· {p_nombre}: debe ${abs(saldo):,.2f}")
 
         lineas.append("")
         lineas.append("ALIAS PARA TRANSFERIR:")
         for p_nombre, saldo in saldos.items():
-            if saldo > 0.01:
+            if saldo > 0.01 and p_nombre in personas_en_gastos:
                 alias_val = mapa_alias.get(p_nombre, '')
                 if alias_val:
                     lineas.append(f"· {p_nombre}: {alias_val}")
