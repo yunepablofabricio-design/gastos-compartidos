@@ -179,10 +179,9 @@ with pestanas[0]:
         for p_nombre, saldo in saldos.items():
             alias_actual = mapa_alias.get(p_nombre, "")
             
-           if saldo > 0.01:
+            if saldo > 0.01:
                 st.write("- **" + p_nombre + "**: debe recibir **$" + f"{saldo:,.2f}" + "** (Alias: " + (alias_actual if alias_actual else 'No configurado') + ")")
                 
-                # Calcular consumo total y pagado de esta persona
                 gasto_total_persona = float(st.session_state.gastos[st.session_state.gastos["Pagado por"] == p_nombre]["Monto"].sum())
                 consumo_total_persona = gasto_total_persona - saldo
                 
@@ -198,7 +197,6 @@ with pestanas[0]:
             elif saldo < -0.01:
                 st.write("- **" + p_nombre + "**: debe pagar **$" + f"{abs(saldo):,.2f}" + "**")
                 
-                # Calcular consumo total y pagado de esta persona
                 gasto_total_persona = float(st.session_state.gastos[st.session_state.gastos["Pagado por"] == p_nombre]["Monto"].sum())
                 consumo_total_persona = gasto_total_persona + abs(saldo)
                 
