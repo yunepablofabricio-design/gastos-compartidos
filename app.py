@@ -144,9 +144,30 @@ with pestanas[0]:
                 guardar_datos(st.session_state.participantes, st.session_state.gastos)
 
     if len(st.session_state.gastos) > 0:
-        st.write("**Detalle de Compras:**")
-        st.dataframe(st.session_state.gastos, use_container_width=True)
+        st.write("**Detalle de Compras (puedes borrar un gasto específico):**")
         
+        # Muestra la lista de compras con un botón individual de eliminación para cada una
+        gastos_a_borrar = None
+        for idx, row in st.session_state.gastos.iterrows():
+            col1, col2, col3, col4, col5 = st.columns([2, 3, 2, 3, 1])
+            with col1:
+                st.write(f"**{row['Descripción']}**")
+            with col2:
+                st.write(f"${float(row['Monto']):,.2f}")
+            with col3:
+                st.write(f"Pagó: {row['Pagado por']}")
+            with col4:
+                st.write(f"({row['Participantes']})")
+            with col5:
+                if st.button("❌", key=f"del_gasto_{idx}"):
+                    gastos_a_borrar = idx
+
+        if gastos_a_borrar is not None:
+            st.session_state.gastos = st.session_state.gastos.drop(index=gastos_a_borrar).reset_index(drop=True)
+            guardar_datos(st.session_state.participantes, st.session_state.gastos)
+            st.rerun()
+
+        st.markdown("---")
         st.session_state.gastos["Monto"] = pd.to_numeric(st.session_state.gastos["Monto"], errors="coerce").fillna(0.0)
         total_general = float(st.session_state.gastos["Monto"].sum())
         st.metric("Gasto Total Acumulado", "$" + f"{total_general:,.2f}")
@@ -213,11 +234,6 @@ with pestanas[0]:
                 st.markdown('<a href="' + url_ind + '" target="_blank"><button style="background-color:#25D366; color:white; border:none; padding:6px 12px; border-radius:4px; font-size:13px; font-weight:bold; cursor:pointer; margin-bottom:10px;">Enviar WhatsApp a ' + p_nombre + '</button></a>', unsafe_allow_html=True)
             else:
                 st.write("- **" + p_nombre + "**: al día ($0.00)")
-                
-        if st.button("Eliminar último gasto"):
-            st.session_state.gastos = st.session_state.gastos.iloc[:-1].reset_index(drop=True)
-            guardar_datos(st.session_state.participantes, st.session_state.gastos)
-            st.rerun()
             
         st.markdown("---")
         st.subheader("Enviar Resumen Corto al Grupo de WhatsApp")
