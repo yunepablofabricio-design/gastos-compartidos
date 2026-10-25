@@ -284,14 +284,22 @@ with pestanas[0]:
                 
                 gasto_total_persona = pagos_por_persona.get(p_nombre, 0.0)
                 
+                # Calcular cuánto consumió esta persona en gastos extras (no (Todos))
+                consumo_extra_persona = 0.0
+                for _, r in st.session_state.gastos.iterrows():
+                    part_raw = [p.strip() for p in str(r['Participantes']).split(",") if p.strip()]
+                    if set(part_raw) != personas_en_gastos and p_nombre in part_raw:
+                        consumo_extra_persona += float(r['Monto']) / len(part_raw)
+                
+                extra_txt = f" (tiene extra de ${consumo_extra_persona:,.2f})" if consumo_extra_persona > 0 else ""
+                
                 if saldo > 0.01:
-                    lineas.append(f"· {p_nombre}: gastó ${gasto_total_persona:,.2f} y debe recibir ${saldo:,.2f}{alias_txt}")
+                    lineas.append(f"· {p_nombre}: gastó ${gasto_total_persona:,.2f} y debe recibir ${saldo:,.2f}{extra_txt}{alias_txt}")
                 elif saldo < -0.01:
                     if gasto_total_persona > 0:
-                        lineas.append(f"· {p_nombre}: gastó ${gasto_total_persona:,.2f} y debe ${abs(saldo):,.2f}")
+                        lineas.append(f"· {p_nombre}: gastó ${gasto_total_persona:,.2f} y debe ${abs(saldo):,.2f}{extra_txt}")
                     else:
-                        lineas.append(f"· {p_nombre}: debe ${abs(saldo):,.2f}")
-
+                        lineas.append(f"· {p_nombre}: debe ${abs(saldo):,.2f}{extra_txt}")
         lineas.append("")
         lineas.append("ALIAS PARA TRANSFERIR:")
         for p_nombre, saldo in saldos.items():
