@@ -146,7 +146,6 @@ with pestanas[0]:
     if len(st.session_state.gastos) > 0:
         st.write("**Detalle de Compras (puedes borrar un gasto específico):**")
         
-        # Muestra la lista de compras con un botón individual de eliminación para cada una
         gastos_a_borrar = None
         for idx, row in st.session_state.gastos.iterrows():
             col1, col2, col3, col4, col5 = st.columns([2, 3, 2, 3, 1])
@@ -172,7 +171,6 @@ with pestanas[0]:
         total_general = float(st.session_state.gastos["Monto"].sum())
         st.metric("Gasto Total Acumulado", "$" + f"{total_general:,.2f}")
         
-        # Calcular saldos y total pagado por cada persona
         saldos = {p["nombre"]: 0.0 for p in st.session_state.participantes}
         pagos_por_persona = {p["nombre"]: 0.0 for p in st.session_state.participantes}
         consumos_por_persona = {p["nombre"]: 0.0 for p in st.session_state.participantes}
@@ -210,7 +208,7 @@ with pestanas[0]:
                 msj_ind += f"· Consumo total individual: ${consumo_total_persona:,.2f}\n"
                 msj_ind += f"· Compras abonadas: ${gasto_total_persona:,.2f}\n"
                 msj_ind += f"· Debe recibir: ${saldo:,.2f}\n\n"
-                msj_ind += "Para que te transfieran, tu alias es: " + (alias_actual if alias_actual else '[Indicar Alias]')
+                msj_ind += "Para যে te transfieran, tu alias es: " + (alias_actual if alias_actual else '[Indicar Alias]')
                 
                 url_ind = "https://api.whatsapp.com/send?text=" + urllib.parse.quote(msj_ind)
                 st.markdown('<a href="' + url_ind + '" target="_blank"><button style="background-color:#25D366; color:white; border:none; padding:6px 12px; border-radius:4px; font-size:13px; font-weight:bold; cursor:pointer; margin-bottom:10px;">Enviar WhatsApp a ' + p_nombre + '</button></a>', unsafe_allow_html=True)
@@ -236,7 +234,7 @@ with pestanas[0]:
                 st.write("- **" + p_nombre + "**: al día ($0.00)")
             
         st.markdown("---")
-        st.subheader("Enviar Resumen Corto al Grupo de WhatsApp")
+        st.subheader("Enviar Resumen al Grupo de WhatsApp")
         
         # Identificar los participantes activos
         personas_en_gastos = set()
@@ -304,7 +302,11 @@ with pestanas[0]:
             
         mensaje_grupo = "\n".join(lineas)
         
+        # --- VISTA PREVIA DEL MENSAJE ANTES DE ENVIAR ---
+        st.markdown("**Vista previa del mensaje para el grupo:**")
+        st.code(mensaje_grupo, language="text")
+        
         url_whatsapp_grupo = "https://api.whatsapp.com/send?text=" + urllib.parse.quote(mensaje_grupo)
-        st.markdown('<a href="' + url_whatsapp_grupo + '" target="_blank"><button style="background-color:#25D366; color:white; border:none; padding:10px 20px; border-radius:5px; font-weight:bold; cursor:pointer; width:100%;">Enviar Resumen Corto al Grupo</button></a>', unsafe_allow_html=True)
+        st.markdown('<a href="' + url_whatsapp_grupo + '" target="_blank"><button style="background-color:#25D366; color:white; border:none; padding:10px 20px; border-radius:5px; font-weight:bold; cursor:pointer; width:100%;">Enviar Resumen al Grupo de WhatsApp</button></a>', unsafe_allow_html=True)
     else:
         st.info("Aún no hay gastos registrados.")
