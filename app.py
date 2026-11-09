@@ -64,7 +64,8 @@ def guardar_datos(participantes, gastos, alias_grupo):
     with open(DATA_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
 
-if 'participantes' not in st.session_state or 'gastos' not in st.session_state:
+# Inicialización segura de session_state
+if 'participantes' not in st.session_state or 'gastos' not in st.session_state or 'alias_grupo' not in st.session_state:
     p, g, ag = cargar_datos()
     st.session_state.participantes = p
     st.session_state.gastos = g
@@ -148,9 +149,10 @@ with pestanas[1]:
 with pestanas[0]:
     st.subheader("Resumen de Cuentas")
     
-    # Campo rápido para cambiar el Alias de transferencia del grupo actual
-    nuevo_alias_grupo = st.text_input("💳 Alias para transferir (modificable según el grupo/viaje):", value=st.session_state.alias_grupo)
-    if nuevo_alias_grupo != st.session_state.alias_grupo:
+    # Campo seguro para el Alias de transferencia del grupo
+    alias_actual_val = st.session_state.get("alias_grupo", "pabloyune")
+    nuevo_alias_grupo = st.text_input("💳 Alias para transferir (modificable según el grupo/viaje):", value=alias_actual_val)
+    if nuevo_alias_grupo != alias_actual_val:
         st.session_state.alias_grupo = nuevo_alias_grupo.strip()
         guardar_datos(st.session_state.participantes, st.session_state.gastos, st.session_state.alias_grupo)
 
@@ -267,8 +269,9 @@ with pestanas[0]:
 
         lineas.append("")
         lineas.append("ALIAS PARA TRANSFERIR:")
-        if st.session_state.alias_grupo:
-            lineas.append(f"· {st.session_state.alias_grupo}")
+        alias_grupo_val = st.session_state.get("alias_grupo", "")
+        if alias_grupo_val:
+            lineas.append(f"· {alias_grupo_val}")
             
         mensaje_grupo = "\n".join(lineas)
         
